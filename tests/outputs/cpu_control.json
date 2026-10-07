@@ -1,0 +1,193 @@
+{
+  "suite": "cpu_control",
+  "started_at": "2026-10-07T08:40:26.945691+00:00",
+  "finished_at": "2026-10-07T08:40:29.494747+00:00",
+  "status": "passed",
+  "cases": [
+    {
+      "id": "test_initial_unloaded_health_and_inference_503",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_load_unload_success_noop_shared_and_conflict",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_control_disconnect_keeps_task_and_status_responds",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_operation_result_stays_with_its_waiter",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_admit_unload_races_and_busy",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_external_limit_models_not_counted_and_not_ready_body",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_rejection_priority_and_atomic_active",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_output_limits_and_preserved_bytes[{\"max_tokens\": 16}-200-None]",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_output_limits_and_preserved_bytes[{\"max_completion_tokens\": 16}-200-None]",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_output_limits_and_preserved_bytes[{\"max_tokens\": 16, \"max_completion_tokens\": 16}-200-None]",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_output_limits_and_preserved_bytes[{\"max_tokens\": 16, \"max_completion_tokens\": 32}-400-conflicting output token limits]",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_output_limits_and_preserved_bytes[{\"max_tokens\": null}-400-output token limits must be positive integers]",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_output_limits_and_preserved_bytes[{\"max_tokens\": true}-400-output token limits must be positive integers]",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_output_limits_and_preserved_bytes[{\"max_tokens\": false}-400-output token limits must be positive integers]",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_output_limits_and_preserved_bytes[{\"max_tokens\": 1.0}-400-output token limits must be positive integers]",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_output_limits_and_preserved_bytes[{\"max_tokens\": 0}-400-output token limits must be positive integers]",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_output_limits_and_preserved_bytes[{\"max_tokens\": -3}-400-output token limits must be positive integers]",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_output_limits_and_preserved_bytes[{\"max_tokens\": \"16\"}-400-output token limits must be positive integers]",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_output_limits_and_preserved_bytes[{\"max_tokens\": 4097}-400-output token limit exceeds 4096]",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_output_limits_and_preserved_bytes[{\"messages\": []}-400-an explicit output token limit is required]",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_output_limits_and_preserved_bytes[{\"max_tokens\": true, \"max_completion_tokens\": 99999}-400-output token limits must be positive integers]",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_output_limits_and_preserved_bytes[{\"max_tokens\": 1, \"max_completion_tokens\": 5000}-400-conflicting output token limits]",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_output_limits_and_preserved_bytes[{\"max_tokens\": 5000, \"max_completion_tokens\": 5000}-400-output token limit exceeds 4096]",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_omitted_limit_can_pass_without_rewriting_body",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_thinking_fields_are_forwarded_unchanged",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_other_post_counts_active_without_output_check_and_chunked_limit",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_bounded_downstream_buffer",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_health_failures_busy_timeout_and_worker_death",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_stream_and_nonstream_disconnect_hold_active_until_upstream_done",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_unconfirmed_upstream_does_not_clear_active",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_load_failure_cleanup_ownership_and_unexpected_exit",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_previous_generation_callback_does_not_overwrite",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_load_timeout_attempts_cleanup_before_not_resident",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_upstream_http_error_does_not_fail_lifecycle",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_status_failure_and_bad_control_body_and_shutdown",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_output_limit_helper_rejects_non_integers",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_owned_process_group_dies_without_signaling_another_runtime",
+      "status": "passed",
+      "detail": "ok"
+    }
+  ]
+}

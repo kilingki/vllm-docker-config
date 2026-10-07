@@ -1,0 +1,9 @@
+.git
+.venv
+local
+tests
+benchmarks
+**/__pycache__
+**/*.pyc
+.env
+.prepare.lock

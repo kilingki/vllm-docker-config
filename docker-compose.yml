@@ -1,0 +1,40 @@
+services:
+  vllm-runtime:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: vllm-docker-runtime:local
+    init: true
+    shm_size: 8gb
+    restart: unless-stopped
+    ports:
+      - "${PUBLIC_PORT:?Set PUBLIC_PORT in .env}:8000"
+    volumes:
+      - ${HOST_MODELS_DIR:?Set HOST_MODELS_DIR in .env}:/models:ro
+      - vllm-cache:/cache
+    env_file:
+      - configs/common.env
+      - configs/models/${MODEL_PROFILE:-qwen3.8-27b}.env
+    environment:
+      CONFIG_DIR: /app/configs
+      MODEL_PROFILE: ${MODEL_PROFILE:-qwen3.8-27b}
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      HF_HOME: /cache/huggingface
+      VLLM_CACHE_ROOT: /cache/vllm
+      TORCH_HOME: /cache/torch
+      XDG_CACHE_HOME: /cache/xdg
+    gpus: all
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+volumes:
+  vllm-cache:

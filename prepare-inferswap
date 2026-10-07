@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Make the vLLM control endpoint reachable.
+# A new or stopped container starts unloaded and does not load the model.
+# A running container is left as it is, including ready or in-flight work.
+set -euo pipefail
+
+root="$(cd "$(dirname "$0")" && pwd)"
+cd "${root}"
+exec python3 -m controller.prepare

@@ -1,0 +1,53 @@
+{
+  "suite": "cpu_prepare",
+  "started_at": "2026-10-07T08:40:26.945691+00:00",
+  "finished_at": "2026-10-07T08:40:29.494747+00:00",
+  "status": "passed",
+  "cases": [
+    {
+      "id": "test_running_container_preserves_status[ready-2]",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_running_container_preserves_status[loading-0]",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_running_container_preserves_status[unloading-0]",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_running_container_preserves_status[failed-1]",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_running_endpoint_error_does_not_restart",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_new_container_must_report_unloaded",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_other_service_status_is_not_success",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_running_identity_mismatch_fails_without_restart",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_concurrent_prepare_is_serialized",
+      "status": "passed",
+      "detail": "ok"
+    }
+  ]
+}
