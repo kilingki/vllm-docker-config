@@ -69,8 +69,8 @@ The `qwen3` reasoning parser can put the body in `message.reasoning` and leave `
 
 | Request | Observed |
 |---|---|
-| Short Korean, non-streaming | HTTP 200, latency 1.55s, TTFT 1.55s, 32.3 output tok/s. `content` is `확인` |
-| Short Korean, streaming | TTFT 0.778s, latency 1.12s. First SSE content or reasoning token. Stream output tok/s is UNMEASURED |
+| Short Korean, non-streaming | HTTP 200, latency 1.55s, 32.3 output tok/s. `content` is `확인` |
+| Short Korean, streaming | TTFT 0.598s, latency 1.35s, remeasured with the per-event reader. Stream output tok/s is UNMEASURED |
 | One 1x1 image | latency 1.74s, 36.7 tok/s. Reasoning describes a solid-color image |
 | Two 1x1 images | latency 1.72s, 37.2 tok/s |
 | Table image | latency 17.06s, `max_tokens` 2048, `finish_reason=stop`. `content` is `1 2 3 4` |
@@ -79,7 +79,7 @@ The `qwen3` reasoning parser can put the body in `message.reasoning` and leave `
 | Concurrency 1 wall | text 0.93s, image 1.82s, mixed 0.83s |
 | Concurrency 2 wall | text 1.12s, image 1.83s, mixed 1.75s. `vllm:num_requests_running` >= 2 |
 | Concurrency 4 wall | text 1.55s, image 2.03s, mixed 2.01s. running >= 2 |
-| Max multimodal | 4 requests, 4 images each, 262144 pixels after processing, `prompt_tokens` 27290, `max_tokens` and `min_tokens` 4096. All four HTTP 200, `completion_tokens` 4096, `finish_reason=length`. Wall about 134s. Preemption 0. Host peak 23777 MiB |
+| Max multimodal | 4 copies of one request, 4 images each, 262144 pixels after processing, `prompt_tokens` 27290, `max_tokens` and `min_tokens` 4096. Prefix caching was on, and a calibration request with the same prompt ran first. All four HTTP 200, `completion_tokens` 4096, `finish_reason=length`. Wall about 134s. Preemption 0. Host peak 23777 MiB |
 
 Per-request TTFT and prefill time for the concurrency waves are UNMEASURED. TTFT for the long input is UNMEASURED.
 
@@ -123,7 +123,7 @@ resourceProfile:
     maxPixels: 262144
 ```
 
-`maxConcurrency: 4` is the value from the passing max-condition 4-way. Each request had 4 images, 262144 pixels after processing, `prompt_tokens` 27290, 4096 output tokens, HTTP 200, `finish_reason=length`, and no preemption. It is not taken from the `max_num_seqs=4` setting alone. The log said the KV pool can overlap about 2.2 requests of 32768 tokens. This pass is the four-request observation above, not that pool log.
+`maxConcurrency: 4` is the value from the passing max-condition 4-way. The four requests were copies of one body: 4 images, 262144 pixels after processing, `prompt_tokens` 27290, 4096 output tokens, HTTP 200, `finish_reason=length`, and no preemption. A calibration request with that same prompt ran immediately before, and prefix caching was on. It is not taken from the `max_num_seqs=4` setting alone. The log said the KV pool can overlap about 2.2 requests of 32768 tokens. Four distinct prompts near that length are outside this observation. This pass is the shared-prefix four-request observation above, not that pool log.
 
 `prepare.argv` is the absolute path of this repository's `prepare-inferswap`, and nothing else. The source of record is `tests/outputs/inferswap_connection.json`.
 

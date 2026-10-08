@@ -835,7 +835,10 @@ def _chat_observed(config: RunConfig, body: bytes) -> dict[str, Any]:
             code = response.status
             consumed = 0
             while True:
-                part = response.read(4096)
+                # Chunked read(4096) waits for 4096 bytes or EOF, so it timestamps
+                # the buffer fill. One decoded byte returns as soon as the chunk arrives.
+                amount = 1 if streaming and ttft is None else 4096
+                part = response.read(amount)
                 if not part:
                     break
                 chunks.append(part)

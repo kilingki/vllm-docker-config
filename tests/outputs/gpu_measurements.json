@@ -22,8 +22,8 @@
     {
       "id": "text_stream",
       "code": 200,
-      "ttft_sec": 0.7782446809869725,
-      "latency_sec": 1.1162910429993644,
+      "ttft_sec": 0.5981927039974835,
+      "latency_sec": 1.345894872007193,
       "output_tok_s": null,
       "usage": null,
       "answer": "",
@@ -317,7 +317,7 @@
   },
   "ttft": {
     "method": "sse_first_token",
-    "text_stream_sec": 0.7782446809869725,
+    "text_stream_sec": 0.5981927039974835,
     "code": 200
   },
   "quality_request_body": "{\"model\":\"qwen3.8-27b\",\"messages\":[{\"role\":\"user\",\"content\":[{\"type\":\"image_url\",\"image_url\":{\"url\":\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADgAAAAaCAAAAADHicD/AAAAdklEQVR42r1TQQrAMAjL/z/txmBjU0NsKJMeVBpiYgvYEXGeO676Kd7t1E9ARK5YfwqUjJ8bOxj/B3Ya9+yR5crVQA+UGnluA9WoVGPmHgLr0Au/o9HoxPCRV8FFI1MmXSVWQjISc9xRiav6W2lzyB4J0NyjGQe4YDr+adigaQAAAABJRU5ErkJggg==\"}},{\"type\":\"text\",\"text\":\"Read the table. Reply with the four numbers in row-major order.\"}]}],\"max_tokens\":2048,\"stream\":false}",

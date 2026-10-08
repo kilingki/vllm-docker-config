@@ -1,11 +1,71 @@
 {
   "suite": "cpu_config",
-  "started_at": "2026-10-08T07:10:25.285513+00:00",
-  "finished_at": "2026-10-08T07:10:25.357882+00:00",
+  "started_at": "2026-10-08T07:55:55.073350+00:00",
+  "finished_at": "2026-10-08T07:55:56.194308+00:00",
   "status": "passed",
   "cases": [
     {
+      "id": "test_model_env_cannot_override_host_or_port",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_extra_argv_rejects_ownership_and_non_arrays",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_profile_argv_uses_only_allowlisted_flags",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_repository_allowlist_builds_both_profile_argvs",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_unconfirmed_reasoning_parser_is_rejected",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_missing_allowlist_fails_before_launch",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_comparison_profile_is_not_default_and_omits_fp8",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_common_limits_and_model_profile_do_not_own_bind",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_model_path_with_spaces_is_one_argument",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_from_env_process_environment_overrides_profile_file",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_gpu_script_check_plan_does_not_claim_gpu_success",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
       "id": "test_gpu_requests_and_evidence_rules",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_streaming_ttft_marks_first_token_before_delayed_close",
       "status": "passed",
       "detail": "ok"
     }

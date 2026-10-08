@@ -310,3 +310,76 @@ def test_gpu_requests_and_evidence_rules():
     )
     assert status == "failed"
     assert "preemption" in detail
+
+
+def test_streaming_ttft_marks_first_token_before_delayed_close():
+    """A chunked SSE body under 4096 bytes must not time TTFT at connection close."""
+    import threading
+    import time
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    from tests.gpu_api import RunConfig, _chat_observed
+
+    delay_sec = 0.35
+    role = b'data: {"choices":[{"delta":{"role":"assistant","content":""}}]}\n\n'
+    token = b'data: {"choices":[{"delta":{"reasoning":"The"}}]}\n\n'
+    done = b"data: [DONE]\n\n"
+    assert len(role + token + done) < 4096
+
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def log_message(self, fmt: str, *args: object) -> None:
+            return
+
+        def do_POST(self) -> None:
+            length = int(self.headers.get("Content-Length", "0"))
+            body = self.rfile.read(length)
+            self.close_connection = True
+            if b'"stream":true' not in body:
+                payload = b'{"choices":[{"message":{"content":"ok"}}]}'
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.send_header("Connection", "close")
+                self.end_headers()
+                self.wfile.write(payload)
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Transfer-Encoding", "chunked")
+            self.send_header("Connection", "close")
+            self.end_headers()
+
+            def send_chunk(payload: bytes) -> None:
+                self.wfile.write(f"{len(payload):x}\r\n".encode("ascii"))
+                self.wfile.write(payload)
+                self.wfile.write(b"\r\n")
+                self.wfile.flush()
+
+            send_chunk(role)
+            send_chunk(token)
+            time.sleep(delay_sec)
+            send_chunk(done)
+            self.wfile.write(b"0\r\n\r\n")
+            self.wfile.flush()
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        config = RunConfig(
+            base_url=f"http://127.0.0.1:{server.server_address[1]}",
+            request_timeout_sec=5,
+        )
+        observed = _chat_observed(config, b'{"stream":true}')
+        assert observed["code"] == 200
+        assert observed["ttft_sec"] is not None
+        assert observed["latency_sec"] >= delay_sec
+        assert observed["ttft_sec"] < delay_sec - 0.1
+        plain = _chat_observed(config, b'{"stream":false}')
+        assert plain["code"] == 200
+        assert plain["ttft_sec"] is None
+    finally:
+        server.shutdown()
+        server.server_close()

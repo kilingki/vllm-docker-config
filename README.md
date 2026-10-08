@@ -249,7 +249,7 @@ The default profile `qwen3.8-27b` is the Qwen3.8-27B VLM. `max_model_len` is 327
 
 The default input is text and `image_url` on `/v1/chat/completions`. Video decoding and frame sampling are not a default input of this runtime. Several images are several content parts.
 
-The verified caps are 4 images per request, processor `max_pixels` 262144, 4096 generated tokens, 4 concurrent requests, and an HTTP body of 32MiB (33554432 bytes). A larger body is 413 `{"detail":"request body too large"}`.
+The verified caps are 4 images per request, processor `max_pixels` 262144, 4096 generated tokens, 4 concurrent copies of one prompt, and an HTTP body of 32MiB (33554432 bytes). That 4-way used prefix caching, a shared prompt of 27290 tokens, and a calibration request with the same prompt immediately before. A larger body is 413 `{"detail":"request body too large"}`.
 
 ## InferSwap connection
 
@@ -279,7 +279,7 @@ resourceProfile:
     maxPixels: 262144
 ```
 
-`maxConcurrency: 4` is the value after four concurrent requests passed with 4 images, 262144 pixels, and 4096 output tokens. It is not taken from `max_num_seqs=4` alone. The source JSON is `tests/outputs/inferswap_connection.json`.
+`maxConcurrency: 4` is the value after four concurrent copies of one request passed with 4 images, 262144 pixels, and 4096 output tokens. Prefix caching was on, the shared prompt was 27290 tokens, and a calibration request with that prompt ran first. It is not taken from `max_num_seqs=4` alone, and it does not cover four distinct prompts near `max_model_len`. The source JSON is `tests/outputs/inferswap_connection.json`.
 
 ## Limitations
 
