@@ -1,0 +1,255 @@
+{
+  "baseline_mib": 1007,
+  "requests": [
+    {
+      "id": "text_nonstream",
+      "code": 200,
+      "ttft_sec": 1.5492482279951219,
+      "latency_sec": 1.549251403004746,
+      "output_tok_s": 32.273651586195676,
+      "usage": {
+        "prompt_tokens": 61,
+        "total_tokens": 111,
+        "completion_tokens": 50,
+        "prompt_tokens_details": null,
+        "completion_tokens_details": {
+          "reasoning_tokens": 46
+        }
+      },
+      "answer": "\n\n확인\nThe user is asking me to respond in Korean with only one word: \"확인\" (which means \"confirm/confirm/acknowledge\" in Korean). They're literally telling me to answer with one word: \"확인\".\n"
+    },
+    {
+      "id": "text_stream",
+      "code": 200,
+      "ttft_sec": 0.5091357450000942,
+      "latency_sec": 0.8037719590065535,
+      "output_tok_s": null,
+      "usage": null,
+      "answer": ""
+    },
+    {
+      "id": "image_single",
+      "code": 200,
+      "ttft_sec": 1.7442702940024901,
+      "latency_sec": 1.7442736210068688,
+      "output_tok_s": 36.691491076415225,
+      "usage": {
+        "prompt_tokens": 122,
+        "total_tokens": 186,
+        "completion_tokens": 64,
+        "prompt_tokens_details": null,
+        "completion_tokens_details": {
+          "reasoning_tokens": 64
+        }
+      },
+      "answer": "The user wants a description of the image. The image is extremely simple: a solid, uniform field of color. I need to identify the color accurately. It's a light, somewhat desaturated reddish-pink, often described as salmon, coral, or a soft pink/salmon hue. There are no objects"
+    },
+    {
+      "id": "image_multi",
+      "code": 200,
+      "ttft_sec": 1.7206158530025277,
+      "latency_sec": 1.720618828010629,
+      "output_tok_s": 37.19591983890847,
+      "usage": {
+        "prompt_tokens": 188,
+        "total_tokens": 252,
+        "completion_tokens": 64,
+        "prompt_tokens_details": null,
+        "completion_tokens_details": {
+          "reasoning_tokens": 64
+        }
+      },
+      "answer": "The user has provided two images and asked me to describe them. Let me look carefully at both images.\n\nBoth images appear to be solid color squares. Let me examine the color. It's a pinkish/salmon color, a flat uniform fill with no gradient, no texture, no objects, no text,"
+    },
+    {
+      "id": "quality_image",
+      "code": 200,
+      "ttft_sec": 1.7188568339915946,
+      "latency_sec": 1.7188597920030588,
+      "output_tok_s": 37.23398516723586,
+      "usage": {
+        "prompt_tokens": 140,
+        "total_tokens": 204,
+        "completion_tokens": 64,
+        "prompt_tokens_details": null,
+        "completion_tokens_details": {
+          "reasoning_tokens": 64
+        }
+      },
+      "answer": "The user wants me to look at the table and extract four numbers in row-major order. Let me carefully examine the image.\n\nThe table has two rows. Let me look at the columns. There's a 2x4 grid structure, but I need to look at where the numbers actually are.\n\nLooking at"
+    }
+  ],
+  "status_samples_during_load_sec": [
+    0.0033007829915732145,
+    0.0017025169945554808,
+    0.0016712260112399235,
+    0.0015953679976519197,
+    0.0017672410031082109,
+    0.0018925619951914996,
+    0.0019880789914168417,
+    0.0017180360009660944,
+    0.0016036190063459799,
+    0.0021588590025203303
+  ],
+  "status_samples_during_unload_sec": [
+    0.0013743770105065778
+  ],
+  "cold_load_sec": 51.42889142036438,
+  "cold_load_peak_mib": 23035,
+  "backend_lines": [
+    "2026-10-08 04:39:19,056 INFO controller.lifecycle: Starting vLLM: ['vllm', 'serve', '/models/qwen3.8-27b', '--host', '127.0.0.1', '--port', '8080', '--served-model-name', 'qwen3.8-27b', '--dtype', 'bfloat16', '--tensor-parallel-size', '1', '--max-model-len', '32768', '--max-num-seqs', '4', '--max-num-batched-tokens', '2048', '--gpu-memory-utilization', '0.90', '--kv-cache-dtype', 'fp8_e4m3', '--en",
+    "2026-10-08 04:39:35,849 INFO controller.lifecycle: [vllm] (APIServer pid=12) INFO 10-08 04:39:35 [api_utils.py:286] non-default args: {'model_tag': '/models/qwen3.8-27b', 'host': '127.0.0.1', 'port': 8080, 'model': '/models/qwen3.8-27b', 'dtype': 'bfloat16', 'max_model_len': 32768, 'served_model_name': ['qwen3.8-27b'], 'reasoning_parser': 'qwen3', 'gpu_memory_utilization': 0.9, 'kv_cache_dtype': '",
+    "2026-10-08 04:39:39,231 INFO controller.lifecycle: [vllm] (APIServer pid=12) INFO 10-08 04:39:39 [cache.py:363] Using fp8_e4m3 data type to store kv cache. It reduces the GPU memory footprint and boosts the performance. Meanwhile, it may cause accuracy drop without a proper scaling factor",
+    "2026-10-08 04:39:39,232 INFO controller.lifecycle: [vllm] (APIServer pid=12) INFO 10-08 04:39:39 [config.py:643] Mamba cache mode is set to 'align' for Qwen3_5ForConditionalGeneration by default when prefix caching is enabled",
+    "2026-10-08 04:39:55,641 INFO controller.lifecycle: [vllm] (EngineCore pid=135) INFO 10-08 04:39:55 [core.py:129] Initializing a V1 LLM engine (v0.31.0) with config: model='/models/qwen3.8-27b', speculative_config=None, tokenizer='/models/qwen3.8-27b', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, tokenizer_revision=None, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len=3",
+    "2026-10-08 04:39:59,940 INFO controller.lifecycle: [vllm] (EngineCore pid=135) INFO 10-08 04:39:59 [cuda.py:585] Using backend AttentionBackendEnum.FLASH_ATTN for vit attention",
+    "2026-10-08 04:39:59,941 INFO controller.lifecycle: [vllm] (EngineCore pid=135) INFO 10-08 04:39:59 [mm_encoder_attention.py:372] Using AttentionBackendEnum.FLASH_ATTN for MMEncoderAttention.",
+    "2026-10-08 04:40:00,007 INFO controller.lifecycle: [vllm] (EngineCore pid=135) INFO 10-08 04:40:00 [__init__.py:870] Using MarlinLinearKernel for mixed-precision linear",
+    "2026-10-08 04:40:00,007 INFO controller.lifecycle: [vllm] (EngineCore pid=135) INFO 10-08 04:40:00 [compressed_tensors_wNa16.py:138] Using MarlinLinearKernel for CompressedTensorsWNA16",
+    "2026-10-08 04:40:00,010 INFO controller.lifecycle: [vllm] (EngineCore pid=135) INFO 10-08 04:40:00 [qwen_gdn_linear_attn.py:177] Using Triton/FLA GDN prefill kernel (requested=auto, head_k_dim=128).",
+    "2026-10-08 04:40:00,010 INFO controller.lifecycle: [vllm] (EngineCore pid=135) INFO 10-08 04:40:00 [qwen_gdn_linear_attn.py:533] GDN decode kernel: cuda",
+    "2026-10-08 04:40:02,631 INFO controller.lifecycle: [vllm] (EngineCore pid=135) INFO 10-08 04:40:02 [cuda.py:526] Using FLASHINFER attention backend out of potential backends: ['FLASHINFER', 'TRITON_ATTN'].",
+    "2026-10-08 04:40:06,157 INFO controller.lifecycle: [vllm] (EngineCore pid=135) WARNING 10-08 04:40:06 [marlin_utils.py:239] Marlin requires thread-tile padding for some weight shapes in this model. Activations and/or outputs of the padded layers are padded/sliced on every forward; performance may be degraded.",
+    "2026-10-08 04:40:06,893 INFO controller.lifecycle: [vllm] (EngineCore pid=135) INFO 10-08 04:40:06 [interface.py:989] Setting attention block size to 1568 tokens to ensure that attention page size is >= mamba page size.",
+    "2026-10-08 04:40:06,893 INFO controller.lifecycle: [vllm] (EngineCore pid=135) INFO 10-08 04:40:06 [interface.py:1013] Padding mamba page size by 0.13% to ensure that mamba page size and attention page size are exactly equal.",
+    "2026-10-08 04:40:17,595 INFO controller.lifecycle: [vllm] (EngineCore pid=135) INFO 10-08 04:40:17 [flashinfer.py:903] FlashInfer resolved query dtypes: prefill=torch.bfloat16, decode=torch.bfloat16, decode_backend=flashinfer-native, kv_cache_dtype=torch.float8_e4m3fn, arch=sm86",
+    "2026-10-08 04:40:19,288 INFO controller.lifecycle: [vllm] (EngineCore pid=135) INFO 10-08 04:40:19 [kv_cache_utils.py:2464] GPU KV cache size: 72,817 tokens, Maximum concurrency for 32,768 tokens per request: 2.22x",
+    "2026-10-08 04:40:19,587 INFO controller.lifecycle: [vllm] (EngineCore pid=135) INFO 10-08 04:40:19 [qwen_triton_warmup.py:294] Warming up Qwen GDN Triton kernels for model_type=qwen3_5_text.",
+    "2026-10-08 04:40:19,640 INFO controller.lifecycle: [vllm] (EngineCore pid=135) INFO 10-08 04:40:19 [mamba_triton_warmup.py:42] Warmed Mamba batch_memcpy_kernel.",
+    "2026-10-08 04:40:23,450 INFO controller.lifecycle: [vllm] (EngineCore pid=135) INFO 10-08 04:40:23 [kv_cache_utils.py:772] kv cache group sizes [1568, 1568, 1568, 1568]",
+    "2026-10-08 04:40:23,451 INFO controller.lifecycle: [vllm] (EngineCore pid=135) INFO 10-08 04:40:23 [kv_cache_utils.py:773] kv lcm block sizes 1568",
+    "2026-10-08 04:40:24,928 INFO controller.lifecycle: [vllm] (APIServer pid=12) WARNING 10-08 04:40:24 [serving.py:221] The chat template requires system-first ordering, so inline system messages in /v1/messages requests (e.g. Claude Code's per-turn reminders) are merged into the leading system prompt. Each new one changes the prompt prefix, so the rest of the conversation misses the prefix cache. Pa",
+    "2026-10-08 04:40:24,958 INFO controller.lifecycle: [vllm] (APIServer pid=12) WARNING 10-08 04:40:24 [serving.py:221] The chat template requires system-first ordering, so inline system messages in /v1/messages requests (e.g. Claude Code's per-turn reminders) are merged into the leading system prompt. Each new one changes the prompt prefix, so the rest of the conversation misses the prefix cache. Pa",
+    "2026-10-08 04:40:25,708 ERROR controller.lifecycle: vLLM worker exited unexpectedly",
+    "2026-10-08 04:41:09,403 INFO controller.lifecycle: Starting vLLM: ['vllm', 'serve', '/models/qwen3.8-27b', '--host', '127.0.0.1', '--port', '8080', '--served-model-name', 'qwen3.8-27b', '--dtype', 'bfloat16', '--tensor-parallel-size', '1', '--max-model-len', '32768', '--max-num-seqs', '4', '--max-num-batched-tokens', '2048', '--gpu-memory-utilization', '0.90', '--kv-cache-dtype', 'fp8_e4m3', '--en",
+    "2026-10-08 04:41:16,520 INFO controller.lifecycle: [vllm] (APIServer pid=42) INFO 10-08 04:41:16 [api_utils.py:286] non-default args: {'model_tag': '/models/qwen3.8-27b', 'host': '127.0.0.1', 'port': 8080, 'model': '/models/qwen3.8-27b', 'dtype': 'bfloat16', 'max_model_len': 32768, 'served_model_name': ['qwen3.8-27b'], 'reasoning_parser': 'qwen3', 'gpu_memory_utilization': 0.9, 'kv_cache_dtype': '",
+    "2026-10-08 04:41:18,688 INFO controller.lifecycle: [vllm] (APIServer pid=42) INFO 10-08 04:41:18 [cache.py:363] Using fp8_e4m3 data type to store kv cache. It reduces the GPU memory footprint and boosts the performance. Meanwhile, it may cause accuracy drop without a proper scaling factor",
+    "2026-10-08 04:41:18,689 INFO controller.lifecycle: [vllm] (APIServer pid=42) INFO 10-08 04:41:18 [config.py:643] Mamba cache mode is set to 'align' for Qwen3_5ForConditionalGeneration by default when prefix caching is enabled",
+    "2026-10-08 04:41:34,830 INFO controller.lifecycle: [vllm] (EngineCore pid=154) INFO 10-08 04:41:34 [core.py:129] Initializing a V1 LLM engine (v0.31.0) with config: model='/models/qwen3.8-27b', speculative_config=None, tokenizer='/models/qwen3.8-27b', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, tokenizer_revision=None, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len=3",
+    "2026-10-08 04:41:37,031 INFO controller.lifecycle: [vllm] (EngineCore pid=154) INFO 10-08 04:41:37 [cuda.py:585] Using backend AttentionBackendEnum.FLASH_ATTN for vit attention",
+    "2026-10-08 04:41:37,032 INFO controller.lifecycle: [vllm] (EngineCore pid=154) INFO 10-08 04:41:37 [mm_encoder_attention.py:372] Using AttentionBackendEnum.FLASH_ATTN for MMEncoderAttention.",
+    "2026-10-08 04:41:37,092 INFO controller.lifecycle: [vllm] (EngineCore pid=154) INFO 10-08 04:41:37 [__init__.py:870] Using MarlinLinearKernel for mixed-precision linear",
+    "2026-10-08 04:41:37,093 INFO controller.lifecycle: [vllm] (EngineCore pid=154) INFO 10-08 04:41:37 [compressed_tensors_wNa16.py:138] Using MarlinLinearKernel for CompressedTensorsWNA16",
+    "2026-10-08 04:41:37,095 INFO controller.lifecycle: [vllm] (EngineCore pid=154) INFO 10-08 04:41:37 [qwen_gdn_linear_attn.py:177] Using Triton/FLA GDN prefill kernel (requested=auto, head_k_dim=128).",
+    "2026-10-08 04:41:37,095 INFO controller.lifecycle: [vllm] (EngineCore pid=154) INFO 10-08 04:41:37 [qwen_gdn_linear_attn.py:533] GDN decode kernel: cuda",
+    "2026-10-08 04:41:37,750 INFO controller.lifecycle: [vllm] (EngineCore pid=154) INFO 10-08 04:41:37 [cuda.py:526] Using FLASHINFER attention backend out of potential backends: ['FLASHINFER', 'TRITON_ATTN'].",
+    "2026-10-08 04:41:43,397 INFO controller.lifecycle: [vllm] (EngineCore pid=154) WARNING 10-08 04:41:43 [marlin_utils.py:239] Marlin requires thread-tile padding for some weight shapes in this model. Activations and/or outputs of the padded layers are padded/sliced on every forward; performance may be degraded.",
+    "2026-10-08 04:41:44,178 INFO controller.lifecycle: [vllm] (EngineCore pid=154) INFO 10-08 04:41:44 [interface.py:989] Setting attention block size to 1568 tokens to ensure that attention page size is >= mamba page size.",
+    "2026-10-08 04:41:44,178 INFO controller.lifecycle: [vllm] (EngineCore pid=154) INFO 10-08 04:41:44 [interface.py:1013] Padding mamba page size by 0.13% to ensure that mamba page size and attention page size are exactly equal.",
+    "2026-10-08 04:41:54,562 INFO controller.lifecycle: [vllm] (EngineCore pid=154) INFO 10-08 04:41:54 [flashinfer.py:903] FlashInfer resolved query dtypes: prefill=torch.bfloat16, decode=torch.bfloat16, decode_backend=flashinfer-native, kv_cache_dtype=torch.float8_e4m3fn, arch=sm86",
+    "2026-10-08 04:41:56,190 INFO controller.lifecycle: [vllm] (EngineCore pid=154) INFO 10-08 04:41:56 [kv_cache_utils.py:2464] GPU KV cache size: 74,031 tokens, Maximum concurrency for 32,768 tokens per request: 2.26x",
+    "2026-10-08 04:41:56,462 INFO controller.lifecycle: [vllm] (EngineCore pid=154) INFO 10-08 04:41:56 [qwen_triton_warmup.py:294] Warming up Qwen GDN Triton kernels for model_type=qwen3_5_text.",
+    "2026-10-08 04:41:56,508 INFO controller.lifecycle: [vllm] (EngineCore pid=154) INFO 10-08 04:41:56 [mamba_triton_warmup.py:42] Warmed Mamba batch_memcpy_kernel.",
+    "2026-10-08 04:41:59,195 INFO controller.lifecycle: [vllm] (EngineCore pid=154) INFO 10-08 04:41:59 [kv_cache_utils.py:772] kv cache group sizes [1568, 1568, 1568, 1568]",
+    "2026-10-08 04:41:59,196 INFO controller.lifecycle: [vllm] (EngineCore pid=154) INFO 10-08 04:41:59 [kv_cache_utils.py:773] kv lcm block sizes 1568",
+    "2026-10-08 04:42:00,498 INFO controller.lifecycle: [vllm] (APIServer pid=42) WARNING 10-08 04:42:00 [serving.py:221] The chat template requires system-first ordering, so inline system messages in /v1/messages requests (e.g. Claude Code's per-turn reminders) are merged into the leading system prompt. Each new one changes the prompt prefix, so the rest of the conversation misses the prefix cache. Pa",
+    "2026-10-08 04:42:00,519 INFO controller.lifecycle: [vllm] (APIServer pid=42) WARNING 10-08 04:42:00 [serving.py:221] The chat template requires system-first ordering, so inline system messages in /v1/messages requests (e.g. Claude Code's per-turn reminders) are merged into the leading system prompt. Each new one changes the prompt prefix, so the rest of the conversation misses the prefix cache. Pa"
+  ],
+  "backend_evidence": {
+    "marlin": "log",
+    "kv_dtype": "log",
+    "decoder_attention": "log",
+    "vision_attention": "log",
+    "gdn_dtype": "log",
+    "kv_scale": "uncalibrated_no_checkpoint_scheme"
+  },
+  "mtp_mentioned": true,
+  "runtime_versions": "0.31.0\n2.13.0+cu130\n13.0\n5.17.0\n",
+  "quality_answer": "The user wants me to look at the table and extract four numbers in row-major order. Let me carefully examine the image.\n\nThe table has two rows. Let me look at the columns. There's a 2x4 grid structure, but I need to look at where the numbers actually are.\n\nLooking at",
+  "concurrency": [
+    {
+      "level": 1,
+      "kind": "text",
+      "ok": true,
+      "elapsed_sec": 0.9295371590123978
+    },
+    {
+      "level": 1,
+      "kind": "image",
+      "ok": true,
+      "elapsed_sec": 1.824157003997243
+    },
+    {
+      "level": 1,
+      "kind": "mixed",
+      "ok": true,
+      "elapsed_sec": 0.8289477189973695
+    },
+    {
+      "level": 2,
+      "kind": "text",
+      "ok": true,
+      "elapsed_sec": 1.1201745869911974
+    },
+    {
+      "level": 2,
+      "kind": "image",
+      "ok": true,
+      "elapsed_sec": 1.8339400770055363
+    },
+    {
+      "level": 2,
+      "kind": "mixed",
+      "ok": true,
+      "elapsed_sec": 1.7463695350015769
+    },
+    {
+      "level": 4,
+      "kind": "text",
+      "ok": true,
+      "elapsed_sec": 1.554582297001616
+    },
+    {
+      "level": 4,
+      "kind": "image",
+      "ok": true,
+      "elapsed_sec": 2.0298944149981253
+    },
+    {
+      "level": 4,
+      "kind": "mixed",
+      "ok": true,
+      "elapsed_sec": 2.010079058993142
+    }
+  ],
+  "prefix_cache": {
+    "first_cached": 0,
+    "second_cached": 0,
+    "first_prompt": 2303,
+    "second_prompt": 2303,
+    "hit_delta": 1568.0
+  },
+  "long_context": {
+    "usage": {
+      "prompt_tokens": 30494,
+      "total_tokens": 30750,
+      "completion_tokens": 256,
+      "prompt_tokens_details": null,
+      "completion_tokens_details": {
+        "reasoning_tokens": 256
+      }
+    },
+    "note": "estimate=30428",
+    "code": 200
+  },
+  "residuals_mib": [
+    970,
+    970,
+    970
+  ],
+  "control_disconnect": {
+    "ok": true,
+    "detail": "disconnect_load status={'state': 'ready', 'residency': 'resident', 'active_requests': 0, 'last_error': None}"
+  },
+  "warm_load_sec": [
+    54.92675280570984,
+    0.0022683143615722656,
+    53.198243379592896
+  ],
+  "multimodal_max": {
+    "ok": true,
+    "elapsed_sec": 7.860048235001159,
+    "note": ""
+  },
+  "inference_peak_mib": 23480
+}

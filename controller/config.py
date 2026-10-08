@@ -248,7 +248,13 @@ def from_env() -> Settings:
     if config_dir:
         profile = os.environ.get("MODEL_PROFILE", "qwen3.8-27b").strip() or "qwen3.8-27b"
         root = Path(config_dir)
-        return load_settings(root / "common.env", root / "models" / f"{profile}.env")
+        merged = dict(parse_env_file(root / "common.env"))
+        merged.update(parse_env_file(root / "models" / f"{profile}.env"))
+        # Compose environment overrides the profile file, matching process env as the runtime source.
+        for key, value in os.environ.items():
+            if key in merged:
+                merged[key] = value
+        return settings_from_mapping(merged)
     return settings_from_mapping(dict(os.environ))
 
 

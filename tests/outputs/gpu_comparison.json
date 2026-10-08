@@ -1,0 +1,59 @@
+{
+  "profile": "qwen3.8-27b-kv-bf16",
+  "status": "measured",
+  "recreate_rc": 0,
+  "startup_status": {
+    "state": "unloaded",
+    "residency": "not_resident",
+    "active_requests": 0,
+    "last_error": null
+  },
+  "baseline_mib": 1001,
+  "load_sec": 171.85025191307068,
+  "load_peak_mib": 22598,
+  "load_code": 200,
+  "load_state": "ready",
+  "backend_lines": [
+    "2026-10-08 04:14:29,883 INFO controller.lifecycle: Starting vLLM: ['vllm', 'serve', '/models/qwen3.8-27b', '--host', '127.0.0.1', '--port', '8080', '--served-model-name', 'qwen3.8-27b', '--dtype', 'bfloat16', '--tensor-parallel-size', '1', '--max-model-len', '32768', '--max-num-seqs', '4', '--max-num-batched-tokens', '2048', '--gpu-memory-utilization', '0.90', '--enable-prefix-caching', '--reasoni",
+    "2026-10-08 04:14:45,187 INFO controller.lifecycle: [vllm] (APIServer pid=12) INFO 10-08 04:14:45 [api_utils.py:286] non-default args: {'model_tag': '/models/qwen3.8-27b', 'host': '127.0.0.1', 'port': 8080, 'model': '/models/qwen3.8-27b', 'dtype': 'bfloat16', 'max_model_len': 32768, 'served_model_name': ['qwen3.8-27b'], 'reasoning_parser': 'qwen3', 'gpu_memory_utilization': 0.9, 'enable_prefix_cach",
+    "2026-10-08 04:14:48,773 INFO controller.lifecycle: [vllm] (APIServer pid=12) INFO 10-08 04:14:48 [config.py:643] Mamba cache mode is set to 'align' for Qwen3_5ForConditionalGeneration by default when prefix caching is enabled",
+    "2026-10-08 04:15:07,168 INFO controller.lifecycle: [vllm] (EngineCore pid=141) INFO 10-08 04:15:07 [core.py:129] Initializing a V1 LLM engine (v0.31.0) with config: model='/models/qwen3.8-27b', speculative_config=None, tokenizer='/models/qwen3.8-27b', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, tokenizer_revision=None, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len=3",
+    "2026-10-08 04:15:09,560 INFO controller.lifecycle: [vllm] (EngineCore pid=141) INFO 10-08 04:15:09 [cuda.py:585] Using backend AttentionBackendEnum.FLASH_ATTN for vit attention",
+    "2026-10-08 04:15:09,562 INFO controller.lifecycle: [vllm] (EngineCore pid=141) INFO 10-08 04:15:09 [mm_encoder_attention.py:372] Using AttentionBackendEnum.FLASH_ATTN for MMEncoderAttention.",
+    "2026-10-08 04:15:09,639 INFO controller.lifecycle: [vllm] (EngineCore pid=141) INFO 10-08 04:15:09 [__init__.py:870] Using MarlinLinearKernel for mixed-precision linear",
+    "2026-10-08 04:15:09,639 INFO controller.lifecycle: [vllm] (EngineCore pid=141) INFO 10-08 04:15:09 [compressed_tensors_wNa16.py:138] Using MarlinLinearKernel for CompressedTensorsWNA16",
+    "2026-10-08 04:15:09,641 INFO controller.lifecycle: [vllm] (EngineCore pid=141) INFO 10-08 04:15:09 [qwen_gdn_linear_attn.py:177] Using Triton/FLA GDN prefill kernel (requested=auto, head_k_dim=128).",
+    "2026-10-08 04:15:09,641 INFO controller.lifecycle: [vllm] (EngineCore pid=141) INFO 10-08 04:15:09 [qwen_gdn_linear_attn.py:533] GDN decode kernel: cuda",
+    "2026-10-08 04:15:12,267 INFO controller.lifecycle: [vllm] (EngineCore pid=141) INFO 10-08 04:15:12 [cuda.py:526] Using FLASH_ATTN attention backend out of potential backends: ['FLASH_ATTN', 'FLASHINFER', 'TRITON_ATTN', 'FLEX_ATTENTION'].",
+    "2026-10-08 04:15:12,268 INFO controller.lifecycle: [vllm] (EngineCore pid=141) INFO 10-08 04:15:12 [flash_attn.py:1167] Using FlashAttention version 2",
+    "2026-10-08 04:15:17,957 INFO controller.lifecycle: [vllm] (EngineCore pid=141) WARNING 10-08 04:15:17 [marlin_utils.py:239] Marlin requires thread-tile padding for some weight shapes in this model. Activations and/or outputs of the padded layers are padded/sliced on every forward; performance may be degraded.",
+    "2026-10-08 04:15:18,705 INFO controller.lifecycle: [vllm] (EngineCore pid=141) INFO 10-08 04:15:18 [interface.py:989] Setting attention block size to 784 tokens to ensure that attention page size is >= mamba page size.",
+    "2026-10-08 04:15:18,705 INFO controller.lifecycle: [vllm] (EngineCore pid=141) INFO 10-08 04:15:18 [interface.py:1013] Padding mamba page size by 0.13% to ensure that mamba page size and attention page size are exactly equal.",
+    "2026-10-08 04:17:09,011 INFO controller.lifecycle: [vllm] (EngineCore pid=141) INFO 10-08 04:17:09 [kv_cache_utils.py:2464] GPU KV cache size: 41,642 tokens, Maximum concurrency for 32,768 tokens per request: 1.27x",
+    "2026-10-08 04:17:09,304 INFO controller.lifecycle: [vllm] (EngineCore pid=141) INFO 10-08 04:17:09 [qwen_triton_warmup.py:294] Warming up Qwen GDN Triton kernels for model_type=qwen3_5_text.",
+    "2026-10-08 04:17:10,265 INFO controller.lifecycle: [vllm] (EngineCore pid=141) INFO 10-08 04:17:10 [mamba_triton_warmup.py:42] Warmed Mamba batch_memcpy_kernel.",
+    "2026-10-08 04:17:19,580 INFO controller.lifecycle: [vllm] (EngineCore pid=141) INFO 10-08 04:17:19 [kv_cache_utils.py:772] kv cache group sizes [784, 784, 784, 784]",
+    "2026-10-08 04:17:19,581 INFO controller.lifecycle: [vllm] (EngineCore pid=141) INFO 10-08 04:17:19 [kv_cache_utils.py:773] kv lcm block sizes 784",
+    "2026-10-08 04:17:21,153 INFO controller.lifecycle: [vllm] (APIServer pid=12) WARNING 10-08 04:17:21 [serving.py:221] The chat template requires system-first ordering, so inline system messages in /v1/messages requests (e.g. Claude Code's per-turn reminders) are merged into the leading system prompt. Each new one changes the prompt prefix, so the rest of the conversation misses the prefix cache. Pa",
+    "2026-10-08 04:17:21,182 INFO controller.lifecycle: [vllm] (APIServer pid=12) WARNING 10-08 04:17:21 [serving.py:221] The chat template requires system-first ordering, so inline system messages in /v1/messages requests (e.g. Claude Code's per-turn reminders) are merged into the leading system prompt. Each new one changes the prompt prefix, so the rest of the conversation misses the prefix cache. Pa"
+  ],
+  "kv_evidence": {
+    "marlin": "log",
+    "kv_dtype": "log",
+    "decoder_attention": "log",
+    "vision_attention": "log",
+    "gdn_dtype": "log",
+    "prefix_cache": "log"
+  },
+  "chat": {
+    "code": 200,
+    "latency_sec": 1.0332575370121049,
+    "ttft_sec": 1.0332528180006193,
+    "answer": ""
+  },
+  "unload_sec": 0.6521205902099609,
+  "unload_code": 200,
+  "residual_mib": 970,
+  "restored_rc": 0,
+  "restored_err": " Container vllm-docker-config-vllm-runtime-1 Recreate \n Container vllm-docker-config-vllm-runtime-1 Recreated \n Container vllm-docker-config-vllm-runtime-1 Starting \n Container vllm-docker-config-vllm-runtime-1 Started \n"
+}

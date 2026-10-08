@@ -1,89 +1,157 @@
-# 1단계 근거 기록
+# 독립 GPU 측정과 InferSwap 연결 정보
 
-정적 조사, 실제 CLI 실행, controller 미로드 기동, GPU 모델 검증을 구분한다. 아래 CLI와 기동 확인은 GPU에서 모델을 load하거나 추론한 결과가 아니다. `tests/outputs/probe_support.json`의 `gpu_inference_success`는 `false`다. `tests/outputs/gpu_api.json`은 `not_run`이며 `tests/gpu_api.py --execute`는 실행하지 않았다.
+이 파일은 설계 §11.3 실측과 §12 연결 정보만 담는다. 수치는 2026-10-08 이 머신에서 `tests/gpu_api.py --execute`와 BF16 비교 로드로 읽은 값이다. 모델 카드 수치는 넣지 않았다.
 
-기록 시각: 2026-10-07T19:54:55Z–2026-10-07T19:56:06Z probe. controller 기동 확인은 그 직전이다.
+## 환경
 
-## 실제 CLI
+| 항목 | 관측 |
+|---|---|
+| GPU | NVIDIA GeForce RTX 3090, 24576 MiB, driver 591.86, SM86 |
+| 호스트 | WSL2 kernel 5.15.153.1-microsoft-standard-WSL2 |
+| Docker | 29.2.1 |
+| 이미지 | `vllm-docker-runtime:local`, id `sha256:936f9a6d71feb5179f0bed3275c28a0eb142d743a84e72e7e39d6ecd8c9b8402` |
+| 런타임 | vLLM 0.31.0, torch 2.13.0+cu130, CUDA 13.0, transformers 5.17.0 |
+| 체크포인트 | `/home/kjh/workspace/models/llm/tf/qwen3.8-27b` (컨테이너 `/models/qwen3.8-27b`) |
+| 저장 형식 | compressed-tensors, pack-quantized, 4bit, group 128, symmetric. `kv_cache_scheme`은 없다 |
+| 아키텍처 | `Qwen3_5ForConditionalGeneration` |
 
-`vllm/vllm-openai:v0.31.0-cu129`는 `torchcodec` 0.17이 `libnvrtc.so.13`과 `libcudart.so.13`에 연결되어 있는데 이미지에는 `libnvrtc.so.12`만 있다. `torchcodec==0.14.0`도 같은 `libnvrtc.so.13`을 요구해서, `.so.12`에 맞는 핀으로 CLI 의존성을 고칠 수 없었다. `.so.12`를 `.so.13`으로 바꾸거나 `torchcodec`을 가짜 모듈로 넣지 않았다.
+로드 전 GPU baseline은 `nvidia-smi` memory.used 1007 MiB이고 compute 프로세스는 없었다. 아래 peak와 residual은 같은 호스트 used 값이다. 런타임에 귀속할 때는 이 baseline을 빼서 적는다. 1 MiB는 1048576 bytes다.
 
-공식 CUDA 13.0 이미지 `vllm/vllm-openai:v0.31.0`로 바꿨다. digest는 `sha256:c1c9f6fd5c109ba7f0546a59f5b2f15fb87f64c77782e90a27b648b42a8e67c3`다. `latest`와 nightly는 쓰지 않는다. 이 이미지의 `libnvrtc.so.13`은 `/usr/local/cuda/targets/x86_64-linux/lib/libnvrtc.so.13`이다.
+## 기본 프로필 argv
 
-최종 런타임 이미지 `vllm-docker-runtime:local`에서 우회 없이 확인했다.
-
-- `vllm --version` 종료 코드 0, 출력 `0.31.0`
-- `vllm serve --help` 종료 코드 0
-- 이미지 안 버전: torch `2.13.0+cu130`, CUDA `13.0`, vLLM `0.31.0`, transformers `5.17.0`, torchcodec `0.17.0+cu130`
-- `torch.cuda.get_device_capability()`는 `[8, 6]`이었다. 장치 확인이지 모델 load가 아니다.
-- `ReasoningParserManager.get_reasoning_parser("qwen3")`는 `Qwen3ParserReasoningAdapter`를 import했다. allowlist `reasoning_parsers`는 `["qwen3"]`다. 이것은 parser 모듈 import이며 모델 template의 thinking 분리 성공이 아니다.
-
-베이스 이미지 `Config.Entrypoint`는 `["vllm", "serve"]`이고 `Cmd`는 없었다. 최종 이미지 ENTRYPOINT는 controller다.
-
-```text
-python3 -m uvicorn controller.main:app --host 0.0.0.0 --port 8000 --workers 1
-```
-
-## controller 미로드 기동
-
-`docker compose config`와 `docker compose up -d --no-build`로 `vllm-runtime`을 기동했다. 호스트 포트는 8000이 이미 사용 중이라 `.env`의 `PUBLIC_PORT=8010`이다. `HOST_MODELS_DIR`는 `/home/kjh/workspace/models/llm/tf`이고 컨테이너 안 경로는 `/models`다.
-
-- `GET /health` 200 `{"controller":"ok"}`
-- `GET /control/status` 200 `{"state":"unloaded","residency":"not_resident","active_requests":0,"last_error":null}`
-- PID 1은 `/sbin/docker-init`이고 그 자식이 uvicorn이다. `vllm serve` 프로세스는 없었다.
-- `POST /control/load`는 호출하지 않았다.
-
-## 체크포인트
-
-호스트 경로는 `/home/kjh/workspace/models/llm/tf/qwen3.8-27b`다. 가중치는 열지 않았고 `loaded`는 `false`다.
-
-- `model_type`은 `qwen3_5`, architecture는 `Qwen3_5ForConditionalGeneration`이다.
-- `quant_method`는 `compressed-tensors`, format은 `pack-quantized`, 4bit, group 128, symmetric이다. `kv_cache_scheme`은 `null`이다. `--quantization`은 넣지 않는다. Marlin kernel 선택은 아직 실행으로 확인하지 않았다.
-- 레이어는 `linear_attention` 48개와 `full_attention` 16개다.
-- processor는 `Qwen3VLProcessor`다. 프로필 `max_pixels` 262144는 preprocessor `longest_edge` 16777216보다 작다.
-
-## 목표 argv
-
-두 프로필 모두 저장소 allowlist로 argv 생성이 된다. 비교 프로필은 기본 `MODEL_PROFILE`이 아니다.
+`MODEL_PROFILE=qwen3.8-27b`. 로그에 찍힌 기동 명령은 다음과 같다.
 
 ```text
-vllm serve /models/qwen3.8-27b
-  --host 127.0.0.1
-  --port 8080
-  --served-model-name qwen3.8-27b
-  --dtype bfloat16
-  --tensor-parallel-size 1
-  --max-model-len 32768
-  --max-num-seqs 4
-  --max-num-batched-tokens 2048
-  --gpu-memory-utilization 0.90
-  --kv-cache-dtype fp8_e4m3
-  --enable-prefix-caching
-  --reasoning-parser qwen3
-  --limit-mm-per-prompt {"image":4}
-  --mm-processor-kwargs {"max_pixels":262144}
+vllm serve /models/qwen3.8-27b --host 127.0.0.1 --port 8080 --served-model-name qwen3.8-27b --dtype bfloat16 --tensor-parallel-size 1 --max-model-len 32768 --max-num-seqs 4 --max-num-batched-tokens 2048 --gpu-memory-utilization 0.90 --kv-cache-dtype fp8_e4m3 --enable-prefix-caching --reasoning-parser qwen3 --limit-mm-per-prompt {"image":4} --mm-processor-kwargs {"max_pixels":262144}
 ```
 
-`configs/models/qwen3.8-27b-kv-bf16.env`는 같은 argv에서 `--kv-cache-dtype`만 빠진다. 이 생략은 BF16 KV 측정이 끝났다는 뜻이 아니다.
+`speculative_config=None`이었다. 체크포인트에 MTP 가중치가 있어도 기본 argv는 speculative를 켜지 않았고, 비활성 플래그를 추가하지 않았다.
 
-help에 있으나 빼 둔 것:
+## backend
 
-- `--quantization`. loader와 Marlin 선택은 미확정이다.
-- 문자열 `auto`. dtype과 KV choice에는 `auto`가 있으나 넘기지 않는다.
-- 생성 기본 상한을 4096 이하로 강제하는 플래그는 확인하지 못했다. `REQUIRE_EXPLICIT_OUTPUT_LIMIT=1`이라 두 출력 필드가 모두 없으면 400이다.
+| 항목 | 로그 |
+|---|---|
+| Linear kernel | `Using MarlinLinearKernel for CompressedTensorsWNA16`. 일부 shape은 Marlin thread-tile padding 경고가 있다 |
+| KV | `Using fp8_e4m3 data type to store kv cache`. scaling factor가 없으면 정확도가 떨어질 수 있다는 경고가 함께 있다. 체크포인트에 KV scheme이 없으므로 calibrated scale이 아니다 |
+| Decoder attention | FlashInfer. 후보 `FLASHINFER`, `TRITON_ATTN`. query는 bfloat16, `kv_cache_dtype=torch.float8_e4m3fn`, `arch=sm86` |
+| Vision attention | FlashAttention (`vit`, `MMEncoderAttention`) |
+| GDN | prefill `Triton/FLA` (`head_k_dim=128`), decode `cuda` |
+| KV 용량 | 한 로드에서 72817 tokens, 32768 입력 기준 2.22x. 다른 로드에서 74031 tokens, 2.26x. 이것은 KV 풀 용량이고 외부 동시성 한도가 아니다 |
+| Prefix | prefix caching on, Mamba cache mode `align`. attention block은 이 로드에서 1568 |
 
-## FP8 KV와 attention
+OOM은 없었다. 케이스 실패로 잡힌 preemption 카운터 증가는 없었다.
 
-이 항목은 소스 읽기이지 GPU 실행이 아니다. 이미지 `fa_utils.py`의 `flash_attn_supports_kv_cache_dtype`는 FP8 KV를 SM90 계열의 FA3 또는 일부 FA4에 연결한다. 관측한 capability `[8, 6]`은 그 조건이 아니다. 체크포인트에는 KV scale scheme이 없다. 기본 프로필의 `KV_CACHE_DTYPE=fp8_e4m3`는 그대로 둔다. 32K, 외부 동시성 4, FP8 목표를 낮추지 않는다. 실제 backend, scale, Marlin, GDN dtype은 2단계 실행으로 남긴다.
+## 시간, peak, residual
 
-## worker 수명
+측정은 호스트 `nvidia-smi`를 0.5초 간격으로 읽고, control status는 load/unload 동안 약 5초마다 호출했다. status 샘플은 1–8ms였고 10초 한도 안이었다.
 
-`v1/executor/multiproc_executor.py`는 `context.Process(...)`로 worker를 만든다. 이 프로세스 트리를 모델 load로 확인하지는 않았다. 컨트롤러는 `vllm serve`를 새 세션에서 띄우고, parent `wait()`만으로 `not_resident`를 선언하지 않는다.
+| 항목 | 값 |
+|---|---|
+| compile cache가 비어 있던 첫 프로세스 기동 | 229.3s, 호스트 peak 22930 MiB |
+| 통과한 실행의 load (compile cache 있음) | 51.4s, 호스트 peak 23035 MiB |
+| 같은 실행의 다음 load | 54.9s, 53.2s. 중복 load 한 번은 0.002s no-op |
+| unload | 세 번의 unload 뒤 호스트 used 970, 970, 970 MiB. worker 프로세스는 없었다 |
+| 추론 구간 호스트 peak | 23480 MiB |
 
-## CPU 테스트와 실행기
+baseline 1007 MiB를 뺀 귀속값:
 
-`tests/outputs/cpu_control.json`, `tests/outputs/cpu_config.json`, `tests/outputs/cpu_prepare.json`은 fake worker와 fake Docker 결과이며 status는 `passed`다. `tests/gpu_api.py --execute`는 단계 번호로 거절하지 않고 §11.2 케이스를 수행하도록 구현되어 있다. 이 단계에서는 호출하지 않았다.
+| 필드 | bytes |
+|---|---|
+| loadPeakBytes | 23098032128 (23035 − 1007 MiB) |
+| inferencePeakBytes | 23564648448 (23480 − 1007 MiB) |
+| unloadedResidualBytes | 0 |
 
-## InferSwap 연결 초안
+unload 호스트 used 970 MiB는 baseline 1007 MiB보다 낮다. 이 런타임이 unload 뒤에 남긴 추가 점유로 0을 적는다. 호스트 전체 970 MiB를 residual로 쓰지 않는다.
 
-측정값은 `README.md`의 연결 예시에 `UNMEASURED`로 두었다. `maxConcurrency`는 `max_num_seqs=4`만으로 4가 아니다.
+## 요청
+
+reasoning parser `qwen3` 때문에 본문이 `message.reasoning`에 있고 `content`가 비는 응답이 있다.
+
+| 요청 | 관측 |
+|---|---|
+| 짧은 한국어, 비스트림 | HTTP 200, latency 1.55s, TTFT 1.55s, 32.3 output tok/s. `content`는 `확인` |
+| 짧은 한국어, 스트림 | TTFT 0.51s, latency 0.80s. 스트림 output tok/s는 UNMEASURED |
+| 1x1 이미지 1장 | latency 1.74s, 36.7 tok/s. reasoning은 단색 이미지로 서술 |
+| 1x1 이미지 2장 | latency 1.72s, 37.2 tok/s |
+| 표 이미지 | latency 1.72s, 64토큰이 모두 reasoning. 표의 행을 보려다 64토큰에서 끝났다. 네 숫자를 확정한 문장은 없다. 목표 argv는 바꾸지 않았다 |
+| 32K에 가까운 입력 | 토크나이저 추정 30428. usage `prompt_tokens` 30494, `completion_tokens` 256, 합 30750. HTTP 200. 한도 32768을 넘기지 않았다 |
+| prefix cache | 2303토큰 prefix를 두 번. usage `cached_tokens`는 0 (세부 usage 비활성). `vllm:prefix_cache_hits`는 1568 증가 |
+| 동시성 1 wall | text 0.93s, image 1.82s, mixed 0.83s |
+| 동시성 2 wall | text 1.12s, image 1.83s, mixed 1.75s. `vllm:num_requests_running` >= 2 |
+| 동시성 4 wall | text 1.55s, image 2.03s, mixed 2.01s. running >= 2 |
+| 최대 multimodal | 요청 4개, 각 이미지 4장, `max_pixels` 262144, `max_tokens` 256. HTTP 200, wall 7.86s |
+
+동시성 wave의 요청별 TTFT와 prefill 시간은 UNMEASURED다. 긴 입력의 TTFT도 UNMEASURED다.
+
+## BF16 KV 비교
+
+비교 프로필 `qwen3.8-27b-kv-bf16`만 잠시 올렸다. `KV_CACHE_DTYPE`은 비어 있고 기본 프로필의 `fp8_e4m3`는 그대로 두었다. 비교가 끝난 뒤 컨테이너는 `MODEL_PROFILE=qwen3.8-27b`, `KV_CACHE_DTYPE=fp8_e4m3`, state `unloaded`로 돌아왔다.
+
+| 항목 | 값 |
+|---|---|
+| load | 171.9s, 호스트 peak 22598 MiB, baseline 1001 MiB |
+| loadPeakBytes (비교) | 22646095872 (22598 − 1001 MiB) |
+| decoder | FlashAttention 2. 후보에 FLASH_ATTN, FLASHINFER, TRITON_ATTN, FLEX_ATTENTION |
+| Marlin | CompressedTensorsWNA16에 MarlinLinearKernel |
+| KV 용량 | 41642 tokens, 32768 기준 1.27x |
+| 짧은 문장 | HTTP 200, latency 1.03s. 응답 문장 텍스트는 UNMEASURED (`content`가 비어 있었고 reasoning은 이 비교 기록에 남지 않음) |
+| unload | 0.65s, 호스트 used 970 MiB |
+
+## §12 연결 예시
+
+InferSwap에는 등록하지 않았다. 이 환경에서 쓸 값은 아래다.
+
+```yaml
+baseURL: http://127.0.0.1:8010
+inferencePath: /v1/chat/completions
+servedModel: qwen3.8-27b
+alias: qwen3.8-27b
+prepare:
+  argv:
+    - vllm
+    - serve
+    - /models/qwen3.8-27b
+    - --host
+    - 127.0.0.1
+    - --port
+    - "8080"
+    - --served-model-name
+    - qwen3.8-27b
+    - --dtype
+    - bfloat16
+    - --tensor-parallel-size
+    - "1"
+    - --max-model-len
+    - "32768"
+    - --max-num-seqs
+    - "4"
+    - --max-num-batched-tokens
+    - "2048"
+    - --gpu-memory-utilization
+    - "0.90"
+    - --kv-cache-dtype
+    - fp8_e4m3
+    - --enable-prefix-caching
+    - --reasoning-parser
+    - qwen3
+    - --limit-mm-per-prompt
+    - '{"image":4}'
+    - --mm-processor-kwargs
+    - '{"max_pixels":262144}'
+resourceProfile:
+  profileId: qwen3.8-27b-fp8-kv
+  loadPeakBytes: 23098032128
+  inferencePeakBytes: 23564648448
+  unloadedResidualBytes: 0
+  maxConcurrency: 4
+  limits:
+    maxBodyBytes: 33554432
+    maxOutputTokens: 4096
+    maxModelLen: 32768
+    maxImagesPerPrompt: 4
+    maxPixels: 262144
+```
+
+`maxConcurrency: 4`는 이미지 4장 × 동시 요청 4가 통과했기 때문이다. `max_num_seqs=4` 설정만으로 적은 값이 아니다. KV 풀은 32768 토큰 요청을 약 2.2개까지 겹칠 수 있다고 로그에 나왔고, 그 조건의 4-way는 이번 측정에 없다.
+
+요청별 TTFT가 비어 있는 항목과 BF16 응답 문장은 UNMEASURED다.

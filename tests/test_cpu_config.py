@@ -182,6 +182,26 @@ def test_model_path_with_spaces_is_one_argument():
     assert isinstance(argv, list)
 
 
+def test_from_env_process_environment_overrides_profile_file(tmp_path, monkeypatch):
+    from controller.config import from_env
+
+    configs = tmp_path / "configs"
+    models = configs / "models"
+    models.mkdir(parents=True)
+    (configs / "common.env").write_text("LOAD_TIMEOUT_SEC=600\nHOST=127.0.0.1\nPORT=8080\n", encoding="utf-8")
+    (models / "qwen3.8-27b.env").write_text(
+        "MODEL_PATH=/models/real\nSERVED_MODEL_NAME=qwen3.8-27b\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CONFIG_DIR", str(configs))
+    monkeypatch.setenv("MODEL_PROFILE", "qwen3.8-27b")
+    monkeypatch.setenv("MODEL_PATH", "/models/does-not-exist-for-failure-check")
+    monkeypatch.setenv("LOAD_TIMEOUT_SEC", "1")
+    settings = from_env()
+    assert settings.model_path == "/models/does-not-exist-for-failure-check"
+    assert settings.load_timeout_sec == 1.0
+
+
 def test_gpu_script_check_plan_does_not_claim_gpu_success():
     import subprocess
     import sys

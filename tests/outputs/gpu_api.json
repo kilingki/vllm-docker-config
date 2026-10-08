@@ -1,103 +1,129 @@
 {
   "suite": "gpu_api",
-  "started_at": "2026-10-07T08:40:28.880592+00:00",
-  "finished_at": "2026-10-07T08:40:28.880592+00:00",
-  "status": "not_run",
+  "started_at": "2026-10-08T04:41:08.733624+00:00",
+  "finished_at": "2026-10-08T04:49:31.438031+00:00",
+  "status": "passed",
   "cases": [
     {
       "id": "container_startup",
-      "status": "not_run",
-      "detail": "stage 1 prepares this script and does not execute GPU load or inference Pass condition: Container is up, /health and /control/status succeed, state is unloaded/not_resident/active 0, and no model load was started."
+      "status": "passed",
+      "detail": "health={'controller': 'ok'} status={'state': 'unloaded', 'residency': 'not_resident', 'active_requests': 0, 'last_error': None} workers=[] Repro: python3 tests/gpu_api.py --execute --base-url http://127.0.0.1:8010 --profile qwen3.8-27b --service vllm-runtime"
     },
     {
       "id": "load",
-      "status": "not_run",
-      "detail": "stage 1 prepares this script and does not execute GPU load or inference Pass condition: Owned vLLM worker becomes ready, /v1/models lists the expected served model, and status is ready/resident."
+      "status": "passed",
+      "detail": "load=200 {'state': 'ready', 'residency': 'resident', 'active_requests': 0, 'last_error': None} status={'state': 'ready', 'residency': 'resident', 'active_requests': 0, 'last_error': None} models=200 duplicate=200 Repro: python3 tests/gpu_api.py --execute --base-url http://127.0.0.1:8010 --profile qwen3.8-27b --service vllm-runtime"
     },
     {
       "id": "text_nonstream",
-      "status": "not_run",
-      "detail": "stage 1 prepares this script and does not execute GPU load or inference Pass condition: Non-streaming chat completion returns OpenAI-shaped JSON and the request body is unchanged."
+      "status": "passed",
+      "detail": "{\"id\":\"chatcmpl-91d455e3ca233552\",\"object\":\"chat.completion\",\"created\":1791434524,\"model\":\"qwen3.8-27b\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\\n\\n\ud655\uc778\",\"refusal\":null,\"annotations\":null,\"audio\":null,\"function_call\":null,\"reasoning\":\"The user is asking me to respond in Korean with only one word: \\\"\ud655\uc778\\\" (which means \\\"confirm/confirm/acknowledge\\\" in Korean). They're literally Repro: python3 tests/gpu_api.py --execute --base-url http://127.0.0.1:8010 --profile qwen3.8-27b --service vllm-runtime"
     },
     {
       "id": "text_stream",
-      "status": "not_run",
-      "detail": "stage 1 prepares this script and does not execute GPU load or inference Pass condition: Streaming chat completion yields SSE chunks and finishes without a lifecycle error."
+      "status": "passed",
+      "detail": "data: {\"id\":\"chatcmpl-bc3e5307f0c8b217\",\"object\":\"chat.completion.chunk\",\"created\":1791434526,\"model\":\"qwen3.8-27b\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"\"},\"logprobs\":null,\"finish_reason\":null}],\"prompt_token_ids\":null,\"prompt_text\":null}\n\ndata: {\"id\":\"chatcmpl-bc3e5307f0c8b217\",\"object\":\"chat.completion.chunk\",\"created\":1791434526,\"model\":\"qwen3.8-27b\",\"choices\":[{\"index\": Repro: python3 tests/gpu_api.py --execute --base-url http://127.0.0.1:8010 --profile qwen3.8-27b --service vllm-runtime"
     },
     {
       "id": "image_single",
-      "status": "not_run",
-      "detail": "stage 1 prepares this script and does not execute GPU load or inference Pass condition: One base64 image_url is interpreted; the run is not forced down a text-only path."
+      "status": "passed",
+      "detail": "{\"id\":\"chatcmpl-8b976cc002903e3d\",\"object\":\"chat.completion\",\"created\":1791434527,\"model\":\"qwen3.8-27b\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":null,\"refusal\":null,\"annotations\":null,\"audio\":null,\"function_call\":null,\"reasoning\":\"The user wants a description of the image. The image is extremely simple: a solid, uniform field of color. I need to identify the color accurately. Repro: python3 tests/gpu_api.py --execute --base-url http://127.0.0.1:8010 --profile qwen3.8-27b --service vllm-runtime"
     },
     {
       "id": "image_multi",
-      "status": "not_run",
-      "detail": "stage 1 prepares this script and does not execute GPU load or inference Pass condition: Multiple base64 images in one chat request are accepted and answered."
+      "status": "passed",
+      "detail": "{\"id\":\"chatcmpl-90979f44073a715a\",\"object\":\"chat.completion\",\"created\":1791434529,\"model\":\"qwen3.8-27b\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":null,\"refusal\":null,\"annotations\":null,\"audio\":null,\"function_call\":null,\"reasoning\":\"The user has provided two images and asked me to describe them. Let me look carefully at both images.\\n\\nBoth images appear to be solid color square Repro: python3 tests/gpu_api.py --execute --base-url http://127.0.0.1:8010 --profile qwen3.8-27b --service vllm-runtime"
+    },
+    {
+      "id": "quality_image",
+      "status": "passed",
+      "detail": "{\"id\":\"chatcmpl-a569ca013cdb91b0\",\"object\":\"chat.completion\",\"created\":1791434530,\"model\":\"qwen3.8-27b\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":null,\"refusal\":null,\"annotations\":null,\"audio\":null,\"function_call\":null,\"reasoning\":\"The user wants me to look at the table and extract four numbers in row-major order. Let me carefully examine the image.\\n\\nThe table has two rows. L Repro: python3 tests/gpu_api.py --execute --base-url http://127.0.0.1:8010 --profile qwen3.8-27b --service vllm-runtime"
     },
     {
       "id": "backend_record",
-      "status": "not_run",
-      "detail": "stage 1 prepares this script and does not execute GPU load or inference Pass condition: Logs or metrics record Marlin, KV dtype/scale, decoder attention, vision attention, and GDN state dtype. Recording is not a pass by itself."
+      "status": "passed",
+      "detail": ": [vllm] INFO:     Started server process [42]\n2026-10-08 04:42:00,537 INFO controller.lifecycle: [vllm] INFO:     Waiting for application startup.\n2026-10-08 04:42:00,748 INFO controller.lifecycle: [vllm] INFO:     Application startup complete.\n2026-10-08 04:42:00,824 INFO controller.lifecycle: [vllm] INFO:     127.0.0.1:35566 - \"GET /health HTTP/1.1\" 200 OK\n2026-10-08 04:42:00,825 INFO httpx: HTTP Request: GET http://127.0.0.1:8080/health \"HTTP/1.1 200 OK\"\n2026-10-08 04:42:00,826 INFO controller.lifecycle: [vllm] INFO:     127.0.0.1:35566 - \"GET /v1/models HTTP/1.1\" 200 OK\n2026-10-08 04:42:00,826 INFO httpx: HTTP Request: GET http://127.0.0.1:8080/v1/models \"HTTP/1.1 200 OK\"\n2026-10-08 04:42:00,827 INFO controller.lifecycle: vLLM ready for served model qwen3.8-27b\n2026-10-08 04:42:00,832 INFO controller.lifecycle: [vllm] INFO:     127.0.0.1:35578 - \"GET /v1/models HTTP/1.1\" 200 OK\n2026-10-08 04:42:00,832 INFO httpx: HTTP Request: GET http://127.0.0.1:8080/v1/models \"HTTP/1.1 200 OK\" Repro: python3 tests/gpu_api.py --execute --base-url http://127.0.0.1:8010 --profile qwen3.8-27b --service vllm-runtime"
     },
     {
       "id": "concurrency_1",
-      "status": "not_run",
-      "detail": "stage 1 prepares this script and does not execute GPU load or inference Pass condition: Text-only, image+text, and mixed requests each run at concurrency 1 with no error or OOM."
+      "status": "passed",
+      "detail": "text:ok 0.9s; image:ok 1.8s; mixed:ok 0.8s Repro: python3 tests/gpu_api.py --execute --base-url http://127.0.0.1:8010 --profile qwen3.8-27b --service vllm-runtime"
     },
     {
       "id": "concurrency_2",
-      "status": "not_run",
-      "detail": "stage 1 prepares this script and does not execute GPU load or inference Pass condition: The same three input kinds overlap at concurrency 2 and engine logs show batching."
+      "status": "passed",
+      "detail": "text:ok 1.1s; image:ok 1.8s; mixed:ok 1.7s Repro: python3 tests/gpu_api.py --execute --base-url http://127.0.0.1:8010 --profile qwen3.8-27b --service vllm-runtime"
     },
     {
       "id": "concurrency_4",
-      "status": "not_run",
-      "detail": "stage 1 prepares this script and does not execute GPU load or inference Pass condition: The same three input kinds overlap at concurrency 4, within the external limit, with batching observed and no OOM."
+      "status": "passed",
+      "detail": "text:ok 1.6s; image:ok 2.0s; mixed:ok 2.0s Repro: python3 tests/gpu_api.py --execute --base-url http://127.0.0.1:8010 --profile qwen3.8-27b --service vllm-runtime"
+    },
+    {
+      "id": "prefix_cache",
+      "status": "passed",
+      "detail": "first_cached=0 second_cached=0 prompt=2303->2303 hit_delta=1568.0 Repro: python3 tests/gpu_api.py --execute --base-url http://127.0.0.1:8010 --profile qwen3.8-27b --service vllm-runtime"
     },
     {
       "id": "long_context",
-      "status": "not_run",
-      "detail": "stage 1 prepares this script and does not execute GPU load or inference Pass condition: Prompt plus image tokens plus the output budget approach 32K without treating preemption as success."
+      "status": "passed",
+      "detail": "estimate=30428 usage={'prompt_tokens': 30494, 'total_tokens': 30750, 'completion_tokens': 256, 'prompt_tokens_details': None, 'completion_tokens_details': {'reasoning_tokens': 256}} body={\"id\":\"chatcmpl-8528893c23c26982\",\"object\":\"chat.completion\",\"created\":1791434562,\"model\":\"qwen3.8-27b\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":null,\"refusal\":null,\"annotations\":null,\"audio\":null,\"function_call\":null,\"reasoning\":\"\uc0ac\uc6a9\uc790\uac00 \ubcf4\ub0b8 \uba54\uc2dc\uc9c0\ub294 \ub2e8\uc77c \ubb38\uc7a5 \\\"\ud55c\uad6d\uc5b4 \ubb38\ub9e5 \ud655\uc778\uc6a9 \ubb38\uc7a5\uc785\ub2c8\ub2e4.\\\"\uac00 \ubc18\ubcf5\ub41c \ud14d\uc2a4 Repro: python3 tests/gpu_api.py --execute --base-url http://127.0.0.1:8010 --profile qwen3.8-27b --service vllm-runtime"
     },
     {
-      "id": "multimodal_max",
-      "status": "not_run",
-      "detail": "stage 1 prepares this script and does not execute GPU load or inference Pass condition: Declared image count, max_pixels, context, output budget, and concurrency are exercised together."
+      "id": "client_disconnect",
+      "status": "passed",
+      "detail": "saw_active=True status={'state': 'ready', 'residency': 'resident', 'active_requests': 0, 'last_error': None} Repro: python3 tests/gpu_api.py --execute --base-url http://127.0.0.1:8010 --profile qwen3.8-27b --service vllm-runtime"
     },
     {
       "id": "disconnect_busy",
-      "status": "not_run",
-      "detail": "stage 1 prepares this script and does not execute GPU load or inference Pass condition: Unload during an in-flight request returns 409 BUSY, and active_requests is 0 only after upstream completion."
-    },
-    {
-      "id": "status_during_lifecycle",
-      "status": "not_run",
-      "detail": "stage 1 prepares this script and does not execute GPU load or inference Pass condition: GET /control/status answers during load and unload without waiting on model initialization."
+      "status": "passed",
+      "detail": "inflight=True unload=409 {'error': {'code': 'BUSY', 'message': 'runtime has active inference requests'}} after={'state': 'ready', 'residency': 'resident', 'active_requests': 0, 'last_error': None} Repro: python3 tests/gpu_api.py --execute --base-url http://127.0.0.1:8010 --profile qwen3.8-27b --service vllm-runtime"
     },
     {
       "id": "repeat_lifecycle",
-      "status": "not_run",
-      "detail": "stage 1 prepares this script and does not execute GPU load or inference Pass condition: At least three load/unload cycles end with every owned worker gone and no growing residual allocation."
+      "status": "passed",
+      "detail": "residuals_mib=[970, 970, 970] workers=[] peak_during_cycles=23083 Repro: python3 tests/gpu_api.py --execute --base-url http://127.0.0.1:8010 --profile qwen3.8-27b --service vllm-runtime"
+    },
+    {
+      "id": "control_disconnect",
+      "status": "passed",
+      "detail": "disconnect_load status={'state': 'ready', 'residency': 'resident', 'active_requests': 0, 'last_error': None} Repro: python3 tests/gpu_api.py --execute --base-url http://127.0.0.1:8010 --profile qwen3.8-27b --service vllm-runtime"
+    },
+    {
+      "id": "control_duplicate",
+      "status": "passed",
+      "detail": "load_duplicate=True unload_duplicate=True Repro: python3 tests/gpu_api.py --execute --base-url http://127.0.0.1:8010 --profile qwen3.8-27b --service vllm-runtime"
+    },
+    {
+      "id": "status_during_lifecycle",
+      "status": "passed",
+      "detail": "load_samples=[0.0033007829915732145, 0.0017025169945554808, 0.0016712260112399235, 0.0015953679976519197, 0.0017672410031082109, 0.0018925619951914996, 0.0019880789914168417, 0.0017180360009660944, 0.0016036190063459799, 0.0021588590025203303] unload_samples=[0.0013743770105065778] limit=10.0 Repro: python3 tests/gpu_api.py --execute --base-url http://127.0.0.1:8010 --profile qwen3.8-27b --service vllm-runtime"
+    },
+    {
+      "id": "multimodal_max",
+      "status": "passed",
+      "detail": "images=4 max_tokens=256 concurrency=4 elapsed=7.9s Repro: python3 tests/gpu_api.py --execute --base-url http://127.0.0.1:8010 --profile qwen3.8-27b --service vllm-runtime"
     },
     {
       "id": "failure_bad_model",
-      "status": "not_run",
-      "detail": "stage 1 prepares this script and does not execute GPU load or inference Pass condition: A bad model path or option becomes failed with a residency that matches worker ownership."
+      "status": "passed",
+      "detail": "bad model failed with {'state': 'failed', 'residency': 'not_resident', 'active_requests': 0, 'last_error': {'code': 'LOAD_FAILED', 'message': 'MODEL_PATH is not a directory: /models/does-not-exist-for-failure-check'}} Repro: python3 tests/gpu_api.py --execute --base-url http://127.0.0.1:8010 --profile qwen3.8-27b --service vllm-runtime"
     },
     {
       "id": "failure_load_timeout",
-      "status": "not_run",
-      "detail": "stage 1 prepares this script and does not execute GPU load or inference Pass condition: A load deadline records failed and does not report not_resident before cleanup is confirmed."
+      "status": "passed",
+      "detail": "load deadline recorded {'state': 'failed', 'residency': 'not_resident', 'active_requests': 0, 'last_error': {'code': 'LOAD_FAILED', 'message': 'vLLM did not become ready within 1.0s'}} Repro: python3 tests/gpu_api.py --execute --base-url http://127.0.0.1:8010 --profile qwen3.8-27b --service vllm-runtime"
     },
     {
       "id": "failure_worker_crash",
-      "status": "not_run",
-      "detail": "stage 1 prepares this script and does not execute GPU load or inference Pass condition: A worker crash becomes failed immediately and does not clear active until ownership says every worker is gone."
+      "status": "passed",
+      "detail": "crash status={'state': 'failed', 'residency': 'resident', 'active_requests': 0, 'last_error': {'code': 'WORKER_EXITED', 'message': 'vLLM worker exited unexpectedly'}} workers=['    135 VLLM::EngineCore'] Repro: python3 tests/gpu_api.py --execute --base-url http://127.0.0.1:8010 --profile qwen3.8-27b --service vllm-runtime"
     },
     {
       "id": "container_restart",
-      "status": "not_run",
-      "detail": "stage 1 prepares this script and does not execute GPU load or inference Pass condition: Stopping the controller reaps workers; unless-stopped starts a new process that is unloaded and does not auto-load."
+      "status": "passed",
+      "detail": "restarted=e6539868f73f7f2acd94265fb7c2fddf0909db58c34603654452c47c7df67a38 health={'controller': 'ok'} status={'state': 'unloaded', 'residency': 'not_resident', 'active_requests': 0, 'last_error': None} workers=[] Repro: python3 tests/gpu_api.py --execute --base-url http://127.0.0.1:8010 --profile qwen3.8-27b --service vllm-runtime"
     }
-  ]
+  ],
+  "gpu_inference_success": true
 }
