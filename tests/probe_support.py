@@ -18,35 +18,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tests.results import utc_now
 
 ROOT = Path(__file__).resolve().parents[1]
-IMAGE = "vllm/vllm-openai:v0.31.0-cu129"
+IMAGE = "vllm/vllm-openai:v0.31.0"
 OUTPUT = ROOT / "tests" / "outputs" / "probe_support.json"
 ALLOWLIST = ROOT / "configs" / "vllm_cli_allowlist.json"
 _RUNTIME_PROBE = r'''
-import importlib.machinery
-import inspect
 import json
 import pathlib
-import sys
-import types
-
-def _stub(name, **attrs):
-    mod = types.ModuleType(name)
-    mod.__spec__ = importlib.machinery.ModuleSpec(name, loader=None)
-    for key, value in attrs.items():
-        setattr(mod, key, value)
-    sys.modules[name] = mod
-    return mod
-
-_stub("torchcodec")
-_stub("torchcodec.decoders", AudioDecoder=object)
-_stub("torchcodec.encoders")
-_stub("torchcodec.samplers")
-_stub("torchcodec.transforms")
-_stub("torchcodec._core")
-_stub("torchcodec._core.ops")
-_stub("torchcodec._core._metadata", AudioStreamMetadata=object, VideoStreamMetadata=object)
+import re
+import traceback
 
 out = {}
+root = None
 try:
     import torch
     import transformers
@@ -61,6 +43,13 @@ try:
     except Exception as exc:
         out["capability_error"] = str(exc)
     root = pathlib.Path(vllm.__file__).resolve().parent
+except Exception:
+    out["import_error"] = traceback.format_exc()
+    candidates = list(pathlib.Path("/usr/local/lib").glob("python*/dist-packages/vllm/__init__.py"))
+    if candidates:
+        root = candidates[0].parent
+
+if root is not None:
     hits = []
     executor = []
     spawn_needles = ("setsid", "start_new_session", "multiprocessing.get_context")
@@ -79,38 +68,38 @@ try:
             executor.append({"file": rel, "markers": [name for name in exec_needles if name in text]})
     out["worker_spawn_hits"] = hits[:60]
     out["executor_files"] = executor
+    fa = root / "v1" / "attention" / "backends" / "fa_utils.py"
     try:
-        from vllm.entrypoints.launchers.cli_args import make_arg_parser
-        from vllm.utils.argparse_utils import FlexibleArgumentParser
-        parser = FlexibleArgumentParser(description="vLLM OpenAI-Compatible RESTful API server.")
-        make_arg_parser(parser)
-        out["serve_help"] = parser.format_help()
-        out["serve_help_source"] = (
-            "image make_arg_parser.format_help(); "
-            "vllm console script was not usable because libnvrtc.so.13 is missing"
-        )
+        source = fa.read_text(encoding="utf-8")
+        match = re.search(r"def flash_attn_supports_kv_cache_dtype\(.*?\n(?:.*\n){0,40}", source)
+        out["fa_source"] = match.group(0) if match else source[:4000]
+    except OSError as exc:
+        out["fa_error"] = repr(exc)
+    try:
+        reg = (root / "reasoning" / "__init__.py").read_text(encoding="utf-8")
+        block = re.search(r"_REASONING_PARSERS_TO_REGISTER\s*=\s*\{(.*?)\n\}", reg, re.S)
+        names = re.findall(r"^\s*[\"']([A-Za-z0-9_]+)[\"']\s*:", block.group(1), re.M) if block else []
+        out["reasoning_parsers_registered"] = names
+        mp = (root / "utils" / "system_utils.py").read_text(encoding="utf-8").splitlines()
+        start = next(i for i, line in enumerate(mp) if line.startswith("def get_mp_context"))
+        out["mp_context_source"] = "\n".join(mp[start:start + 14])
+        wsl = next(i for i, line in enumerate(mp) if "WSL is detected" in line)
+        out["mp_wsl_source"] = "\n".join(mp[wsl - 2:wsl + 8])
     except Exception as exc:
-        out["serve_help_error"] = repr(exc)
-except Exception as exc:
-    out["import_error"] = repr(exc)
-try:
-    from vllm.v1.attention.backends import fa_utils
-    out["fa_source"] = inspect.getsource(fa_utils.flash_attn_supports_kv_cache_dtype)
-except Exception as exc:
-    out["fa_error"] = repr(exc)
-try:
-    import re
-    reg = (root / "reasoning" / "__init__.py").read_text(encoding="utf-8")
-    block = re.search(r"_REASONING_PARSERS_TO_REGISTER\s*=\s*\{(.*?)\n\}", reg, re.S)
-    names = re.findall(r"^\s*[\"']([A-Za-z0-9_]+)[\"']\s*:", block.group(1), re.M) if block else []
-    out["reasoning_parsers_registered"] = names
-    mp = (root / "utils" / "system_utils.py").read_text(encoding="utf-8").splitlines()
-    start = next(i for i, line in enumerate(mp) if line.startswith("def get_mp_context"))
-    out["mp_context_source"] = "\n".join(mp[start:start + 14])
-    wsl = next(i for i, line in enumerate(mp) if "WSL is detected" in line)
-    out["mp_wsl_source"] = "\n".join(mp[wsl - 2:wsl + 8])
-except Exception as exc:
-    out["source_excerpt_error"] = repr(exc)
+        out["source_excerpt_error"] = repr(exc)
+
+imported = []
+errors = {}
+if not out.get("import_error"):
+    try:
+        import vllm.reasoning
+        from vllm.reasoning.abs_reasoning_parsers import ReasoningParserManager
+        ReasoningParserManager.get_reasoning_parser("qwen3")
+        imported.append("qwen3")
+    except Exception as exc:
+        errors["qwen3"] = f"{type(exc).__name__}: {exc}"
+out["reasoning_parsers_imported"] = imported
+out["reasoning_parser_errors"] = errors
 print(json.dumps(out))
 '''
 
@@ -269,28 +258,6 @@ def _json_stdout(text: str) -> dict:
     return payload if isinstance(payload, dict) else {}
 
 
-def _reasoning_parsers(help_text: str, flags: list[str]) -> list[str] | None:
-    if "--reasoning-parser" not in flags:
-        return None
-    for line in help_text.splitlines():
-        if "--reasoning-parser" not in line:
-            continue
-        brace = re.search(r"\{([^{}]+)\}", line)
-        if brace:
-            names = [part.strip() for part in brace.group(1).split(",") if part.strip()]
-            if names:
-                return names
-    match = re.search(
-        r"--reasoning-parser[\s\S]{0,800}?(?:choices|Possible choices):\s*([^\n]+)",
-        help_text,
-        re.IGNORECASE,
-    )
-    if not match:
-        return None
-    names = re.findall(r"[A-Za-z][A-Za-z0-9_]*", match.group(1))
-    return names or None
-
-
 def _help_excerpts(help_text: str) -> dict[str, str]:
     keys = (
         "kv-cache-dtype",
@@ -325,6 +292,7 @@ def image_probe(docker_ok: bool) -> dict:
             "image": IMAGE,
         }
     info = json.loads(listed.stdout)[0]
+    config = info.get("Config") or {}
     digest = (info.get("RepoDigests") or [None])[0]
     image_id = info.get("Id")
     version = run(
@@ -346,6 +314,21 @@ def image_probe(docker_ok: bool) -> dict:
         ],
         timeout=180,
     )
+    help_all = run(
+        [
+            "docker",
+            "run",
+            "--rm",
+            "--gpus",
+            "all",
+            "--entrypoint",
+            "vllm",
+            IMAGE,
+            "serve",
+            "--help=all",
+        ],
+        timeout=180,
+    )
     runtime = run(
         [
             "docker",
@@ -362,13 +345,12 @@ def image_probe(docker_ok: bool) -> dict:
         timeout=180,
     )
     runtime_payload = _json_stdout(runtime.stdout)
-    help_stdout = help_text.stdout if help_text.returncode == 0 else ""
-    help_source = "vllm serve --help"
-    if not help_stdout:
-        help_stdout = str(runtime_payload.get("serve_help") or "")
-        help_source = str(runtime_payload.get("serve_help_source") or "unconfirmed")
-    flags = sorted(set(re.findall(r"--[A-Za-z0-9][A-Za-z0-9-]*", help_stdout)))
-    parsers = _reasoning_parsers(help_stdout, flags)
+    cli_ok = version.returncode == 0 and help_text.returncode == 0 and help_all.returncode == 0
+    help_stdout = help_all.stdout if help_all.returncode == 0 else ""
+    help_source = "vllm --version; vllm serve --help; vllm serve --help=all" if cli_ok else "unconfirmed"
+    flags = sorted(set(re.findall(r"--[A-Za-z0-9][A-Za-z0-9-]*", help_stdout))) if cli_ok else []
+    imported = runtime_payload.get("reasoning_parsers_imported") or []
+    parsers = list(imported) if imported else None
     intended = [
         "--host",
         "--port",
@@ -391,12 +373,28 @@ def image_probe(docker_ok: bool) -> dict:
         "image": IMAGE,
         "digest": digest,
         "image_id": image_id,
+        "entrypoint": config.get("Entrypoint"),
+        "cmd": config.get("Cmd"),
         "vllm_version_cli": version.stdout.strip(),
+        "vllm_version_exit": version.returncode,
         "vllm_version_error": version.stderr.strip(),
-        "help_ok": bool(flags),
+        "help_exit": help_text.returncode,
+        "help_all_exit": help_all.returncode,
+        "cli_ok": cli_ok,
+        "help_ok": cli_ok,
         "help_source": help_source,
-        "help_error": "" if help_text.returncode == 0 else (help_text.stderr or help_text.stdout).strip()[:2000],
-        "console_help_ok": help_text.returncode == 0,
+        "help_error": ""
+        if cli_ok
+        else "\n".join(
+            part
+            for part in (
+                version.stderr.strip(),
+                help_text.stderr.strip(),
+                help_all.stderr.strip(),
+            )
+            if part
+        )[:4000],
+        "console_help_ok": cli_ok,
         "flags": flags,
         "intended_flags_present": [flag for flag in intended if flag in flags],
         "intended_flags_missing": [flag for flag in intended if flag not in flags],
@@ -420,6 +418,8 @@ def image_probe(docker_ok: bool) -> dict:
         "executor_files": runtime_payload.get("executor_files") or [],
         "worker_spawn_error": runtime_payload.get("worker_error"),
         "reasoning_parsers_registered": runtime_payload.get("reasoning_parsers_registered") or [],
+        "reasoning_parsers_imported": runtime_payload.get("reasoning_parsers_imported") or [],
+        "reasoning_parser_errors": runtime_payload.get("reasoning_parser_errors") or {},
         "mp_context_source": runtime_payload.get("mp_context_source") or "",
         "mp_wsl_source": runtime_payload.get("mp_wsl_source") or "",
         "source_excerpt_error": runtime_payload.get("source_excerpt_error"),
@@ -464,10 +464,10 @@ def main() -> int:
         },
         {
             "id": "vllm_image_cli",
-            "status": "passed" if image.get("help_ok") else "not_run",
-            "detail": "image CLI probe "
-            + ("completed" if image.get("help_ok") else "not completed")
-            + "; this is not a GPU inference pass",
+            "status": "passed" if image.get("cli_ok") else "not_run",
+            "detail": "real vllm --version and vllm serve --help "
+            + ("exited 0" if image.get("cli_ok") else "did not exit 0")
+            + "; format_help and module stubs are not a CLI pass; this is not a GPU inference pass",
         },
     ]
     payload = {

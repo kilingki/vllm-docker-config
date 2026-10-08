@@ -1,7 +1,7 @@
 {
   "suite": "cpu_config",
-  "started_at": "2026-10-07T08:40:26.945691+00:00",
-  "finished_at": "2026-10-07T08:40:29.494747+00:00",
+  "started_at": "2026-10-07T19:53:47.570388+00:00",
+  "finished_at": "2026-10-07T19:53:50.383895+00:00",
   "status": "passed",
   "cases": [
     {
@@ -16,6 +16,11 @@
     },
     {
       "id": "test_profile_argv_uses_only_allowlisted_flags",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_repository_allowlist_builds_both_profile_argvs",
       "status": "passed",
       "detail": "ok"
     },
@@ -46,6 +51,11 @@
     },
     {
       "id": "test_gpu_script_check_plan_does_not_claim_gpu_success",
+      "status": "passed",
+      "detail": "ok"
+    },
+    {
+      "id": "test_gpu_requests_and_evidence_rules",
       "status": "passed",
       "detail": "ok"
     }

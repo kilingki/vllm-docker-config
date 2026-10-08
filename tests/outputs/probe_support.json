@@ -1,7 +1,7 @@
 {
   "suite": "probe_support",
-  "started_at": "2026-10-07T08:38:51.762377+00:00",
-  "finished_at": "2026-10-07T08:39:39.819651+00:00",
+  "started_at": "2026-10-07T19:54:55.662446+00:00",
+  "finished_at": "2026-10-07T19:56:06.102595+00:00",
   "status": "passed",
   "gpu_inference_success": false,
   "cases": [
@@ -23,7 +23,7 @@
     {
       "id": "vllm_image_cli",
       "status": "passed",
-      "detail": "image CLI probe completed; this is not a GPU inference pass"
+      "detail": "real vllm --version and vllm serve --help exited 0; format_help and module stubs are not a CLI pass; this is not a GPU inference pass"
     }
   ],
   "docker": {
@@ -158,15 +158,24 @@
   "image": {
     "available": true,
     "reason": null,
-    "image": "vllm/vllm-openai:v0.31.0-cu129",
-    "digest": "vllm/vllm-openai@sha256:ff29e51a9457f191deb332b96fa6440584fa941aa2a548449b604e2b1e5e1eeb",
-    "image_id": "sha256:ff29e51a9457f191deb332b96fa6440584fa941aa2a548449b604e2b1e5e1eeb",
-    "vllm_version_cli": "",
-    "vllm_version_error": "Traceback (most recent call last):\n  File \"/usr/local/lib/python3.12/dist-packages/torch/_ops.py\", line 1516, in load_library\n    ctypes.CDLL(path)\n  File \"/usr/lib/python3.12/ctypes/__init__.py\", line 379, in __init__\n    self._handle = _dlopen(self._name, mode)\n                   ^^^^^^^^^^^^^^^^^^^^^^^^^\nOSError: libnvrtc.so.13: cannot open shared object file: No such file or directory\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"/usr/local/bin/vllm\", line 10, in <module>\n    sys.exit(main())\n             ^^^^^^\n  File \"/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/cli/main.py\", line 43, in main\n    import vllm.entrypoints.cli.benchmark.main\n  File \"/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/cli/benchmark/main.py\", line 12, in <module>\n    from vllm.entrypoints.serve.utils.api_utils import VLLM_SUBCMD_PARSER_EPILOG\n  File \"/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/utils/api_utils.py\", line 19, in <module>\n    from vllm.engine.arg_utils import EngineArgs\n  File \"/usr/local/lib/python3.12/dist-packages/vllm/engine/arg_utils.py\", line 135, in <module>\n    from vllm.v1.sample.logits_processor import LogitsProcessor\n  File \"/usr/local/lib/python3.12/dist-packages/vllm/v1/sample/logits_processor/__init__.py\", line 16, in <module>\n    from vllm.sampling_params import SamplingParams\n  File \"/usr/local/lib/python3.12/dist-packages/vllm/sampling_params.py\", line 23, in <module>\n    from vllm.v1.serial_utils import PydanticMsgspecMixin\n  File \"/usr/local/lib/python3.12/dist-packages/vllm/v1/serial_utils.py\", line 25, in <module>\n    from vllm.multimodal.inputs import (\n  File \"/usr/local/lib/python3.12/dist-packages/vllm/multimodal/__init__.py\", line 3, in <module>\n    from .hasher import MultiModalHasher\n  File \"/usr/local/lib/python3.12/dist-packages/vllm/multimodal/hasher.py\", line 17, in <module>\n    from .media import MediaWithBytes\n  File \"/usr/local/lib/python3.12/dist-packages/vllm/multimodal/media/__init__.py\", line 3, in <module>\n    from .audio import AudioEmbeddingMediaIO, AudioMediaIO\n  File \"/usr/local/lib/python3.12/dist-packages/vllm/multimodal/media/audio.py\", line 40, in <module>\n    from torchcodec.decoders import AudioDecoder\n  File \"/usr/local/lib/python3.12/dist-packages/torchcodec/__init__.py\", line 13, in <module>\n    from . import decoders, encoders, samplers, transforms  # noqa\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/dist-packages/torchcodec/decoders/__init__.py\", line 7, in <module>\n    from .._core import AudioStreamMetadata, VideoStreamMetadata\n  File \"/usr/local/lib/python3.12/dist-packages/torchcodec/_core/__init__.py\", line 8, in <module>\n    from ._metadata import (\n  File \"/usr/local/lib/python3.12/dist-packages/torchcodec/_core/_metadata.py\", line 16, in <module>\n    from torchcodec._core.ops import (\n  File \"/usr/local/lib/python3.12/dist-packages/torchcodec/_core/ops.py\", line 35, in <module>\n    load_image_library()\n  File \"/usr/local/lib/python3.12/dist-packages/torchcodec/_internally_replaced_utils.py\", line 71, in load_image_library\n    torch.ops.load_library(image_library_path)\n  File \"/usr/local/lib/python3.12/dist-packages/torch/_ops.py\", line 1518, in load_library\n    raise OSError(f\"Could not load this library: {path}\") from e\nOSError: Could not load this library: /usr/local/lib/python3.12/dist-packages/torchcodec/libtorchcodec_image.so",
+    "image": "vllm/vllm-openai:v0.31.0",
+    "digest": "vllm/vllm-openai@sha256:c1c9f6fd5c109ba7f0546a59f5b2f15fb87f64c77782e90a27b648b42a8e67c3",
+    "image_id": "sha256:c1c9f6fd5c109ba7f0546a59f5b2f15fb87f64c77782e90a27b648b42a8e67c3",
+    "entrypoint": [
+      "vllm",
+      "serve"
+    ],
+    "cmd": null,
+    "vllm_version_cli": "0.31.0",
+    "vllm_version_exit": 0,
+    "vllm_version_error": "",
+    "help_exit": 0,
+    "help_all_exit": 0,
+    "cli_ok": true,
     "help_ok": true,
-    "help_source": "image make_arg_parser.format_help(); vllm console script was not usable because libnvrtc.so.13 is missing",
-    "help_error": "Traceback (most recent call last):\n  File \"/usr/local/lib/python3.12/dist-packages/torch/_ops.py\", line 1516, in load_library\n    ctypes.CDLL(path)\n  File \"/usr/lib/python3.12/ctypes/__init__.py\", line 379, in __init__\n    self._handle = _dlopen(self._name, mode)\n                   ^^^^^^^^^^^^^^^^^^^^^^^^^\nOSError: libnvrtc.so.13: cannot open shared object file: No such file or directory\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"/usr/local/bin/vllm\", line 10, in <module>\n    sys.exit(main())\n             ^^^^^^\n  File \"/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/cli/main.py\", line 43, in main\n    import vllm.entrypoints.cli.benchmark.main\n  File \"/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/cli/benchmark/main.py\", line 12, in <module>\n    from vllm.entrypoints.serve.utils.api_utils import VLLM_SUBCMD_PARSER_EPILOG\n  File \"/usr/local/lib/python3.12/dist-packages/vllm/entrypoints/serve/utils/api_utils.py\", line 19, in <module>\n    from vllm.engine.arg_utils import EngineArgs\n  File \"/usr/local/lib/python3.12/dist-packages/vllm/engine/arg_utils.py\", line 135, in <module>\n    from vllm.v1.sample.logits_processor import LogitsProcessor\n  File \"/usr/local/lib/python3.12/dist-packages/vllm/v1/sample/logits_processor/__init__.py\", line 16, in <module>\n    from vllm.sampling_params import SamplingParams\n  File \"/usr/local/lib/python3.12/dist-packages/vllm/sampling_params.py\", line 23, in <module>\n    from vllm.v1.serial_utils import PydanticMsgspecMixin\n  File \"/usr/local/lib/python3.12/dist-packages/vllm/v1/serial_utils.py\", line 25, in <module>\n    from vllm.multimodal.inputs import (\n  File \"/usr/local/lib/python3.12/dist-packages/vllm/multimodal/__init__.py\", line 3, in <module>\n    from .hasher import MultiModalHasher\n  File \"/usr/local/lib/python3.12/dist-packages/vllm/multimodal/hasher.py\", line 17, in <module>\n    from .media import MediaWithBytes\n  File \"/usr/local/lib/",
-    "console_help_ok": false,
+    "help_source": "vllm --version; vllm serve --help; vllm serve --help=all",
+    "help_error": "",
+    "console_help_ok": true,
     "flags": [
       "--additional-config",
       "--aggregate-engine-logging",
@@ -179,6 +188,7 @@
       "--allowed-methods",
       "--allowed-origins",
       "--anthropic-disabled-thinking-effort",
+      "--api-",
       "--api-key",
       "--api-server-count",
       "--async-scheduling",
@@ -200,8 +210,11 @@
       "--cpu-distributed-timeout-seconds",
       "--cpu-offload-gb",
       "--cpu-offload-params",
+      "--cpunodebind",
       "--cudagraph-capture-sizes",
       "--cudagraph-metrics",
+      "--data-",
+      "--data-parallel-",
       "--data-parallel-address",
       "--data-parallel-backend",
       "--data-parallel-external-lb",
@@ -222,6 +235,7 @@
       "--default-chat-template-kwargs",
       "--default-mm-loras",
       "--device-ids",
+      "--device-memory-utilization",
       "--diffusion-config",
       "--disable-access-log-for-endpoints",
       "--disable-cascade-attn",
@@ -229,6 +243,7 @@
       "--disable-custom-all-reduce",
       "--disable-fastapi-docs",
       "--disable-hybrid-kv-cache-manager",
+      "--disable-log-",
       "--disable-log-stats",
       "--disable-nccl-for-dp-synchronization",
       "--disable-sliding-window",
@@ -295,12 +310,14 @@
       "--fingerprint-value",
       "--fully-sharded-loras",
       "--gdn-prefill-backend",
+      "--generation-",
       "--generation-config",
       "--gpu-memory-utilization",
       "--grpc",
       "--h11-max-header-count",
       "--h11-max-incomplete-event-size",
       "--headless",
+      "--help",
       "--hf-config-path",
       "--hf-overrides",
       "--hf-token",
@@ -311,6 +328,7 @@
       "--ir-op-priority",
       "--jit-monitor-mode",
       "--jit-monitor-verbose",
+      "--json-arg",
       "--kda-decode-backend",
       "--kda-prefill-backend",
       "--kernel-config",
@@ -325,6 +343,7 @@
       "--kv-sharing-fast-prefill",
       "--kv-transfer-config",
       "--language-model-only",
+      "--limit-",
       "--limit-mm-per-prompt",
       "--linear-backend",
       "--load-format",
@@ -364,7 +383,9 @@
       "--max-num-seqs",
       "--max-parallel-loading-workers",
       "--media-io-kwargs",
+      "--membind",
       "--middleware",
+      "--mm-",
       "--mm-device-do-normalize",
       "--mm-encoder-attn-backend",
       "--mm-encoder-attn-dtype",
@@ -483,10 +504,12 @@
       "--offload-params",
       "--offload-prefetch-step",
       "--optimization-level",
+      "--otlp-traces-",
       "--otlp-traces-endpoint",
       "--override-generation-config",
       "--per-request-spec-decode-metrics",
       "--performance-mode",
+      "--physcpubind",
       "--pipeline-parallel-size",
       "--pooler-config",
       "--port",
@@ -519,6 +542,7 @@
       "--scheduling-policy",
       "--seed",
       "--served-model-name",
+      "--show-hidden-metrics-for-",
       "--show-hidden-metrics-for-version",
       "--shutdown-timeout",
       "--skip-mm-profiling",
@@ -582,19 +606,21 @@
       "--mm-processor-kwargs"
     ],
     "intended_flags_missing": [],
-    "reasoning_parsers": null,
+    "reasoning_parsers": [
+      "qwen3"
+    ],
     "help_excerpts": {
-      "kv-cache-dtype": "          [--kv-cache-dtype {auto,bfloat16,float16,fp8,fp8_ds_mla,fp8_e4m3,fp8_e5m2,fp8_inc,fp8_per_token_head,int4_per_token_head,int8_per_token_head,nvfp4,nvfp4_4over6,nvfp4_ds_mla,turboquant_3bit_nc,turboquant_4bit_nc,turboquant_k3v4_nc,turboquant_k8v4}]\n          [--num-gpu-blocks-override NUM_GPU_BLOCKS_OVERRIDE]\n          [--enable-prefix-caching | --no-enable-prefix-caching]\n          [--prefix-caching-hash-algo {sha256,sha256_cbor,xxhash,xxhash_cbor}]\n          [--prefix-cache-retention-interval PREFIX_CACHE_RETENTION_INTERVAL]\n          [--kv-cache-dtype-skip-layers KV_CACHE_DTYPE_SKIP_LAYERS [KV_CACHE_DTYPE_SKIP_LAYERS ...]]",
-      "reasoning-parser": "          [--reasoning-parser REASONING_PARSER]\n          [--reasoning-parser-plugin REASONING_PARSER_PLUGIN]\n          [--distributed-executor-backend ['external_launcher', 'mp', 'ray', 'uni']]\n          [--pipeline-parallel-size PIPELINE_PARALLEL_SIZE]\n          [--master-addr MASTER_ADDR] [--master-port MASTER_PORT]\n          [--nnodes NNODES] [--node-rank NODE_RANK]",
-      "prefix-caching": "          [--prefix-caching-hash-algo {sha256,sha256_cbor,xxhash,xxhash_cbor}]\n          [--prefix-cache-retention-interval PREFIX_CACHE_RETENTION_INTERVAL]\n          [--kv-cache-dtype-skip-layers KV_CACHE_DTYPE_SKIP_LAYERS [KV_CACHE_DTYPE_SKIP_LAYERS ...]]\n          [--kv-sharing-fast-prefill | --no-kv-sharing-fast-prefill]\n          [--swa-bounded-replay | --no-swa-bounded-replay]\n          [--mamba-cache-dtype {auto,bfloat16,float16,float32}]",
-      "limit-mm-per-prompt": "          [--limit-mm-per-prompt LIMIT_MM_PER_PROMPT]\n          [--enable-mm-embeds | --no-enable-mm-embeds]\n          [--media-io-kwargs MEDIA_IO_KWARGS]\n          [--mm-processor-kwargs MM_PROCESSOR_KWARGS]\n          [--mm-processor-cache-gb MM_PROCESSOR_CACHE_GB]\n          [--mm-processor-cache-type {lru,shm}]",
-      "mm-processor-kwargs": "          [--mm-processor-kwargs MM_PROCESSOR_KWARGS]\n          [--mm-processor-cache-gb MM_PROCESSOR_CACHE_GB]\n          [--mm-processor-cache-type {lru,shm}]\n          [--mm-hasher-algorithm {blake3,sha256,sha512}]\n          [--mm-shm-cache-max-object-size-mb MM_SHM_CACHE_MAX_OBJECT_SIZE_MB]\n          [--mm-encoder-only | --no-mm-encoder-only]",
-      "max-model-len": "          [--max-model-len MAX_MODEL_LEN] [--quantization QUANTIZATION]\n          [--quantization-config QUANTIZATION_CONFIG]\n          [--allow-deprecated-quantization | --no-allow-deprecated-quantization]\n          [--enforce-eager | --no-enforce-eager]\n          [--enable-return-routed-experts | --no-enable-return-routed-experts]\n          [--return-sampling-mask | --no-return-sampling-mask]",
-      "dtype": "          [--dtype {auto,bfloat16,float,float16,float32,half}] [--seed SEED]\n          [--hf-config-path HF_CONFIG_PATH]\n          [--allowed-local-media-path ALLOWED_LOCAL_MEDIA_PATH]\n          [--allowed-media-domains ALLOWED_MEDIA_DOMAINS [ALLOWED_MEDIA_DOMAINS ...]]\n          [--revision REVISION] [--code-revision CODE_REVISION]\n          [--tokenizer-revision TOKENIZER_REVISION]"
+      "kv-cache-dtype": "  --kv-cache-dtype {auto,bfloat16,float16,fp8,fp8_ds_mla,fp8_e4m3,fp8_e5m2,fp8_inc,fp8_per_token_head,int4_per_token_head,int8_per_token_head,nvfp4,nvfp4_4over6,nvfp4_ds_mla,turboquant_3bit_nc,turboquant_4bit_nc,turboquant_k3v4_nc,turboquant_k8v4}\n                        Data type for kv cache storage. If \"auto\", will use\n                        model data type. CUDA 11.8+ supports fp8 (=fp8_e4m3)\n                        and fp8_e5m2. ROCm (AMD GPU) supports fp8 (=fp8_e4m3).\n                        Intel Gaudi (HPU) supports fp8 (using fp8_inc). Some\n                        models (namely DeepSeekV3.2) default to fp8, set to",
+      "reasoning-parser": "  --reasoning-parser REASONING_PARSER\n                        Select the reasoning parser depending on the model\n                        that you're using. This is used to parse the reasoning\n                        content into OpenAI API format. (default: )\n  --reasoning-parser-plugin REASONING_PARSER_PLUGIN\n                        Path to a dynamically reasoning parser plugin that can",
+      "prefix-caching": "  --prefix-caching-hash-algo {sha256,sha256_cbor,xxhash,xxhash_cbor}\n                        Set the hash algorithm for prefix caching:\n                        - \"sha256\" uses Pickle for object serialization before\n                        hashing. This is the current default, as SHA256 is the\n                        most secure choice to avoid potential hash collisions.\n                        - \"sha256_cbor\" provides a reproducible, cross-",
+      "limit-mm-per-prompt": "                        When enabled with `--limit-mm-per-prompt` set to 0 for\n                        a modality, precomputed embeddings skip count\n                        validation for that modality,  saving memory by not\n                        loading encoder modules while still enabling\n                        embeddings as an input. Limits greater than 0 still\n                        apply to embeddings.",
+      "mm-processor-kwargs": "  --mm-processor-kwargs MM_PROCESSOR_KWARGS\n                        Arguments to be forwarded to the model's processor for\n                        multi-modal data, e.g., image processor. Overrides for\n                        the multi-modal processor obtained from\n                        `transformers.AutoProcessor.from_pretrained`.\n                        The available overrides depend on the model that is",
+      "max-model-len": "  --max-model-len MAX_MODEL_LEN\n                        Model context length (prompt and output). If\n                        unspecified, will be automatically derived from the\n                        model config.\n                        When passing via `--max-model-len`, supports\n                        k/m/g/K/M/G in human-readable format. Examples:",
+      "dtype": "  --dtype {auto,bfloat16,float,float16,float32,half}\n                        Data type for model weights and activations:\n                        - \"auto\" will use FP16 precision for FP32 and FP16\n                        models, and BF16 precision for BF16 models.\n                        - \"half\" for FP16. Recommended for AWQ quantization.\n                        - \"float16\" is the same as \"half\"."
     },
     "runtime_versions": {
-      "torch": "2.13.0+cu129",
-      "cuda": "12.9",
+      "torch": "2.13.0+cu130",
+      "cuda": "13.0",
       "vllm": "0.31.0",
       "transformers": "5.17.0",
       "capability": [
@@ -731,11 +757,15 @@
       "step3p5",
       "inkling"
     ],
+    "reasoning_parsers_imported": [
+      "qwen3"
+    ],
+    "reasoning_parser_errors": {},
     "mp_context_source": "def get_mp_context():\n    \"\"\"Get a multiprocessing context with a particular method (spawn or fork).\n    By default we follow the value of the VLLM_WORKER_MULTIPROC_METHOD to\n    determine the multiprocessing method (default is fork). However, under\n    certain conditions, we may enforce spawn and override the value of\n    VLLM_WORKER_MULTIPROC_METHOD.\n    \"\"\"\n    _maybe_force_spawn()\n    # (ROCm): Sync GPU visibility env vars so spawned children inherit\n    # consistent values. Must run after _maybe_force_spawn and regardless\n    # of whether spawn was already set.\n    _sync_visible_devices_env_vars()\n    mp_method = envs.VLLM_WORKER_MULTIPROC_METHOD\n    return multiprocessing.get_context(mp_method)",
     "mp_wsl_source": "\n    if in_wsl():\n        reasons.append(\"WSL is detected and NVML is not compatible with fork\")\n\n    if reasons:\n        logger.warning(\n            \"We must use the `spawn` multiprocessing start method. \"\n            \"Overriding VLLM_WORKER_MULTIPROC_METHOD to 'spawn'. \"\n            \"See https://docs.vllm.ai/en/latest/usage/\"\n            \"troubleshooting.html#python-multiprocessing \"",
     "source_excerpt_error": null
   },
-  "fp8_kv_fa_source": "def flash_attn_supports_kv_cache_dtype(\n    kv_cache_dtype: str = \"fp8_e4m3\",\n    *,\n    requires_alibi: bool = False,\n    head_size: int | None = None,\n    head_size_v: int | None = None,\n    has_sinks: bool = False,\n    requires_softcap: bool = False,\n    kv_cache_block_size: int | None = None,\n    supports_fa4_hd256: bool = False,\n) -> bool:\n    if kv_cache_dtype == \"fp8_e5m2\":\n        return False\n    if current_platform.is_xpu():\n        return True\n    fa_version = get_flash_attn_version(\n        requires_alibi=requires_alibi,\n        head_size=head_size,\n        head_size_v=head_size_v,\n        has_sinks=has_sinks,\n        requires_softcap=requires_softcap,\n        kv_cache_block_size=kv_cache_block_size,\n        supports_fa4_hd256=supports_fa4_hd256,\n    )\n    is_sm90 = current_platform.is_device_capability_family(90)\n    sm90_fp8_kv_supported = fa_version == 3 or (\n        fa_version == 4 and head_size in (None, 512)\n    )\n    return (sm90_fp8_kv_supported and is_sm90) or (\n        fa_version == 4 and current_platform.is_device_capability_family(100)\n    )\n",
+  "fp8_kv_fa_source": "def flash_attn_supports_kv_cache_dtype(\n    kv_cache_dtype: str = \"fp8_e4m3\",\n    *,\n    requires_alibi: bool = False,\n    head_size: int | None = None,\n    head_size_v: int | None = None,\n    has_sinks: bool = False,\n    requires_softcap: bool = False,\n    kv_cache_block_size: int | None = None,\n    supports_fa4_hd256: bool = False,\n) -> bool:\n    if kv_cache_dtype == \"fp8_e5m2\":\n        return False\n    if current_platform.is_xpu():\n        return True\n    fa_version = get_flash_attn_version(\n        requires_alibi=requires_alibi,\n        head_size=head_size,\n        head_size_v=head_size_v,\n        has_sinks=has_sinks,\n        requires_softcap=requires_softcap,\n        kv_cache_block_size=kv_cache_block_size,\n        supports_fa4_hd256=supports_fa4_hd256,\n    )\n    is_sm90 = current_platform.is_device_capability_family(90)\n    sm90_fp8_kv_supported = fa_version == 3 or (\n        fa_version == 4 and head_size in (None, 512)\n    )\n    return (sm90_fp8_kv_supported and is_sm90) or (\n        fa_version == 4 and current_platform.is_device_capability_family(100)\n    )\n\n\ndef flash_attn_supports_quant_query_input() -> bool:\n    return not current_platform.is_xpu()\n\n\ndef flash_attn_supports_sinks() -> bool:\n    if current_platform.is_xpu():\n        return True\n    return get_flash_attn_version() in (3, 4)\n",
   "reference_repo": {
     "name": "kilingki/llama-cpp-docker-config",
     "revision": "e655a2f2ad3979bc5c4a7b4204b80bad08de42e9",

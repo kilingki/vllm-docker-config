@@ -75,6 +75,22 @@ def test_profile_argv_uses_only_allowlisted_flags():
         settings.vllm_serve_argv(CliAllowlist(frozenset({"--host"}), ("qwen3",)))
 
 
+def test_repository_allowlist_builds_both_profile_argvs():
+    default = load_settings(ROOT / "configs/common.env", ROOT / "configs/models/qwen3.8-27b.env")
+    comparison = load_settings(
+        ROOT / "configs/common.env",
+        ROOT / "configs/models/qwen3.8-27b-kv-bf16.env",
+    )
+    default_argv = default.vllm_serve_argv()
+    comparison_argv = comparison.vllm_serve_argv()
+    assert default_argv[:3] == ["vllm", "serve", "/models/qwen3.8-27b"]
+    assert "--reasoning-parser" in default_argv and "qwen3" in default_argv
+    assert "--kv-cache-dtype" in default_argv and "fp8_e4m3" in default_argv
+    assert "--kv-cache-dtype" not in comparison_argv
+    assert "--reasoning-parser" in comparison_argv and "qwen3" in comparison_argv
+    assert "auto" not in default_argv and "auto" not in comparison_argv
+
+
 def test_unconfirmed_reasoning_parser_is_rejected():
     settings = load_settings(ROOT / "configs/common.env", ROOT / "configs/models/qwen3.8-27b.env")
     with pytest.raises(ConfigError, match="unconfirmed"):
@@ -171,9 +187,69 @@ def test_gpu_script_check_plan_does_not_claim_gpu_success():
     import sys
 
     script = ROOT / "tests" / "gpu_api.py"
-    completed = subprocess.run([sys.executable, str(script), "--check-plan"], check=False, text=True)
-    assert completed.returncode == 0, completed.stderr
-    payload = json.loads((ROOT / "tests" / "outputs" / "gpu_api.json").read_text(encoding="utf-8"))
-    assert payload["status"] == "not_run"
-    assert payload["cases"]
-    assert all(case["status"] == "not_run" for case in payload["cases"])
+    output = ROOT / "tests" / "outputs" / "gpu_api.json"
+    original = output.read_text(encoding="utf-8")
+    output.write_text('{"suite":"gpu_api","status":"sentinel"}\n', encoding="utf-8")
+    try:
+        completed = subprocess.run(
+            [sys.executable, str(script), "--check-plan"],
+            check=False,
+            text=True,
+            capture_output=True,
+        )
+        assert completed.returncode == 0, completed.stderr
+        bare = subprocess.run(
+            [sys.executable, str(script)],
+            check=False,
+            text=True,
+            capture_output=True,
+        )
+        assert bare.returncode == 0, bare.stderr
+        assert "not executed" in bare.stderr
+        assert output.read_text(encoding="utf-8") == '{"suite":"gpu_api","status":"sentinel"}\n'
+        source = script.read_text(encoding="utf-8")
+        assert "stage 2 execution was requested" not in source
+        assert "def execute_suite" in source
+    finally:
+        output.write_text(original, encoding="utf-8")
+
+
+def test_gpu_requests_and_evidence_rules():
+    from tests.gpu_api import (
+        RunConfig,
+        build_chat_request,
+        concurrency_bodies,
+        context_approached,
+        evidence_from_text,
+        judge_case,
+    )
+
+    text = build_chat_request("qwen3.8-27b", kind="text", max_tokens=32)
+    image = build_chat_request("qwen3.8-27b", kind="image", images=1, text="Describe the image.")
+    assert b"image_url" not in text
+    assert b'"max_tokens":32' in text
+    assert b"image_url" in image
+    assert b"data:image/png;base64," in image
+    config = RunConfig(base_url="http://127.0.0.1:9")
+    mixed = concurrency_bodies(config, 4, "mixed")
+    assert len(mixed) == 4
+    assert sum(b"image_url" in body for body in mixed) == 2
+    status, detail = judge_case("backend_record", http_ok=True, evidence={})
+    assert status == "failed"
+    assert "not backend evidence" in detail
+    status, detail = judge_case("concurrency_4", http_ok=True, evidence={})
+    assert status == "failed"
+    assert "batching" in detail
+    logs = "selected marlin kernel kv_cache_dtype=fp8_e4m3 k_scale=1.0 attention backend flashinfer vision attention sdpa mamba cache dtype float32"
+    found = evidence_from_text(logs)
+    status, _detail = judge_case("backend_record", http_ok=True, evidence=found)
+    assert status == "passed"
+    assert context_approached({"prompt_tokens": 32000, "completion_tokens": 16}, 64) is True
+    assert context_approached({"prompt_tokens": 10, "completion_tokens": 2}, 64) is False
+    status, detail = judge_case(
+        "long_context",
+        http_ok=True,
+        evidence={"preemption": "log", "context_tokens": "usage"},
+    )
+    assert status == "failed"
+    assert "preemption" in detail
