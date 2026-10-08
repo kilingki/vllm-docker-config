@@ -1,0 +1,21 @@
+{
+  "baseURL": "http://127.0.0.1:8010",
+  "inferencePath": "/v1/chat/completions",
+  "servedModel": "qwen3.8-27b",
+  "prepare": {
+    "argv": [
+      "/home/kjh/workspace/vllm-docker-config/prepare-inferswap"
+    ]
+  },
+  "resourceProfile": {
+    "profileId": "qwen3.8-27b-fp8-kv",
+    "confirmed": false,
+    "unconfirmed": [
+      "maxConcurrency",
+      "maxPixels",
+      "maxOutputTokens",
+      "inferencePeakBytes"
+    ],
+    "reason": "max condition incomplete: output_budget. processed_pixels=262144 source_pixels=589824 calibration_prompt=27290 preemption_before=0.0 preemption_samples=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] peak_mib=23613 requests=[{'code': 200, 'prompt_tokens': 27290, 'completion_tokens': 4096, 'finish_reason': 'length', 'latency_sec': 124.04300576300011}, {'code': 200, 'prompt_tokens': 27290, 'completion_tokens': 4096, 'finish_reason': 'length', 'latency_sec': 124.08421794899914}, {'code': 200, 'prompt_toke"
+  }
+}

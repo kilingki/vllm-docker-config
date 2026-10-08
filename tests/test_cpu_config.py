@@ -242,6 +242,10 @@ def test_gpu_requests_and_evidence_rules():
         context_approached,
         evidence_from_text,
         judge_case,
+        pixels_hit_cap,
+        quality_should_retry,
+        sse_event_has_token,
+        table_numbers_in_content,
     )
 
     text = build_chat_request("qwen3.8-27b", kind="text", max_tokens=32)
@@ -264,6 +268,35 @@ def test_gpu_requests_and_evidence_rules():
     found = evidence_from_text(logs)
     status, _detail = judge_case("backend_record", http_ok=True, evidence=found)
     assert status == "passed"
+    kernel_only = (
+        "Using Triton/FLA GDN prefill kernel. GDN decode kernel: cuda. "
+        "Mamba cache mode is set to align. Warmed Mamba batch_memcpy_kernel."
+    )
+    kernel_found = evidence_from_text(kernel_only)
+    assert "gdn_dtype" not in kernel_found
+    status, detail = judge_case("backend_record", http_ok=True, evidence=kernel_found)
+    assert status == "failed"
+    assert "gdn_dtype" in detail
+    assert table_numbers_in_content("1, 2, 3, 4")
+    assert table_numbers_in_content("the numbers are 1 2 3 4.")
+    assert not table_numbers_in_content("12, 3, 4")
+    assert not table_numbers_in_content(None)
+    assert quality_should_retry(None, "length")
+    assert quality_should_retry("  ", "length")
+    assert not quality_should_retry("1, 2, 3, 4", "length")
+    assert not quality_should_retry(None, "stop")
+    role_event = 'data: {"choices":[{"delta":{"role":"assistant","content":""}}]}'
+    token_event = 'data: {"choices":[{"delta":{"reasoning":"The"}}]}'
+    assert not sse_event_has_token(role_event)
+    assert sse_event_has_token(token_event)
+    assert pixels_hit_cap(768 * 768, 262144)
+    assert not pixels_hit_cap(56 * 26, 56 * 26)
+    status, detail = judge_case("quality_image", http_ok=True, evidence={})
+    assert status == "failed"
+    assert "1, 2, 3, 4" in detail
+    status, detail = judge_case("multimodal_max", http_ok=True, evidence={})
+    assert status == "failed"
+    assert "max condition incomplete" in detail
     assert context_approached({"prompt_tokens": 32000, "completion_tokens": 16}, 64) is True
     assert context_approached({"prompt_tokens": 10, "completion_tokens": 2}, 64) is False
     status, detail = judge_case(

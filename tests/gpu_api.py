@@ -10,6 +10,7 @@ import argparse
 import base64
 import json
 import os
+import re
 import socket
 import struct
 import subprocess
@@ -21,7 +22,7 @@ import urllib.error
 import urllib.request
 import zlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable
 
@@ -33,10 +34,28 @@ ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "tests" / "outputs" / "gpu_api.json"
 MEASUREMENTS = ROOT / "tests" / "outputs" / "gpu_measurements.json"
 COMPARISON = ROOT / "tests" / "outputs" / "gpu_comparison.json"
+CONNECTION = ROOT / "tests" / "outputs" / "inferswap_connection.json"
+PREPARE = ROOT / "prepare-inferswap"
 SERVICE = "vllm-runtime"
 STATUS_RESPONSE_LIMIT_SEC = 10.0
 LONG_CONTEXT_TARGET_TOKENS = 30000
+CONTEXT_LIMIT_TOKENS = 32768
+MAX_PIXELS = 262144
+MAX_OUTPUT_BUDGET = 4096
+MULTIMODAL_MAX_TIMEOUT_SEC = 3600
+QUALITY_FIRST_TOKENS = 2048
+CAP_IMAGE_WIDTH = 768
+CAP_IMAGE_HEIGHT = 768
 RESIDUAL_GROWTH_MIB = 256
+_MIB = 1048576
+_GDN_DTYPE_RE = re.compile(
+    r"(?:mamba|gdn|ssm)(?:[\s_\-]+(?:cache|state|ssm)){0,3}[\s_\-]*dtype[\s:=]+"
+    r"(?:torch\.)?(?:bfloat16|float32|float16|fp32|fp16|bf16)\b"
+)
+_TABLE_NUMBER_RE = re.compile(
+    r"(?<!\d)1(?!\d)\D+(?<!\d)2(?!\d)\D+(?<!\d)3(?!\d)\D+(?<!\d)4(?!\d)",
+    re.DOTALL,
+)
 
 # 1x1 PNG. Stage 2 uses this data URL so image checks do not fetch a host path.
 _PNG = base64.b64encode(
@@ -140,7 +159,7 @@ CASES = [
     },
     {
         "id": "quality_image",
-        "pass_condition": "A table image with small text is accepted and the model answer is recorded for quality notes.",
+        "pass_condition": "The table answer content contains 1, 2, 3, 4 in that order. HTTP success alone is not enough.",
     },
 ]
 
@@ -273,14 +292,73 @@ def evidence_from_text(text: str) -> dict[str, str]:
         ("kv_scale", ("kv_scale", "k_scale", "v_scale", "calculate_kv_scales")),
         ("decoder_attention", ("flashinfer", "flash_attn", "triton_attn", "attention backend", "using flashattention")),
         ("vision_attention", ("vision attention", "mm_encoder_attn", "vit attention", "for vit attention")),
-        ("gdn_dtype", ("mamba", "gdn", "linear_attention", "ssm cache", "gdn decode kernel")),
         ("prefix_cache", ("prefix cache hit", "cached tokens", "prefix_cache_hits")),
         ("oom", ("out of memory", "cuda oom")),
         ("preemption", ("preemptions:",)),
     ):
         if any(needle in lowered for needle in needles):
             found[label] = "log"
+    if gdn_state_dtype_phrases(lowered):
+        found["gdn_dtype"] = "log"
     return found
+
+
+def gdn_state_dtype_phrases(text: str) -> list[str]:
+    """Return state-dtype phrases. Kernel names and cache mode do not count."""
+    return [match.group(0) for match in _GDN_DTYPE_RE.finditer(text.lower())]
+
+
+def table_numbers_in_content(content: str | None) -> bool:
+    return isinstance(content, str) and _TABLE_NUMBER_RE.search(content) is not None
+
+
+def pixels_hit_cap(source_pixels: int, processed_pixels: int, cap: int = MAX_PIXELS) -> bool:
+    """True when a larger image was resized onto the configured pixel cap."""
+    if source_pixels <= cap or processed_pixels <= 0 or processed_pixels > cap:
+        return False
+    return processed_pixels >= (cap * 95) // 100
+
+
+def output_budget_fits(
+    prompt_tokens: int,
+    output_budget: int = MAX_OUTPUT_BUDGET,
+    floor: int = LONG_CONTEXT_TARGET_TOKENS,
+    limit: int = CONTEXT_LIMIT_TOKENS,
+) -> bool:
+    total = prompt_tokens + output_budget
+    return floor <= total <= limit
+
+
+def sse_event_has_token(event: str) -> bool:
+    """True when an SSE event carries a non-empty content or reasoning token."""
+    for line in event.splitlines():
+        if not line.startswith("data:"):
+            continue
+        data = line[5:].strip()
+        if not data or data == "[DONE]":
+            continue
+        try:
+            payload = json.loads(data)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(payload, dict):
+            continue
+        choices = payload.get("choices")
+        if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+            continue
+        delta = choices[0].get("delta")
+        if not isinstance(delta, dict):
+            continue
+        for key in ("content", "reasoning", "reasoning_content"):
+            value = delta.get(key)
+            if isinstance(value, str) and value != "":
+                return True
+    return False
+
+
+def quality_should_retry(content: str | None, finish_reason: str | None) -> bool:
+    blank = not isinstance(content, str) or not content.strip()
+    return blank and finish_reason == "length"
 
 
 def judge_case(case_id: str, *, http_ok: bool, evidence: dict[str, str], detail: str = "") -> tuple[str, str]:
@@ -318,6 +396,23 @@ def judge_case(case_id: str, *, http_ok: bool, evidence: dict[str, str], detail:
         if not evidence.get("prefix_cache"):
             return "failed", detail or "repeated prefix did not show cached tokens or a prefill drop"
         return "passed", detail or "prefix reuse observed"
+    if case_id == "quality_image":
+        if not http_ok:
+            return "failed", detail or "quality request failed"
+        if not evidence.get("table_answer"):
+            return "failed", detail or "content did not contain 1, 2, 3, 4 in order"
+        return "passed", detail or "table numbers were in content"
+    if case_id == "multimodal_max":
+        if not http_ok:
+            return "failed", detail or "max requests failed"
+        missing = [
+            key
+            for key in ("pixels", "context_tokens", "output_budget", "concurrency", "preemption_clear")
+            if not evidence.get(key)
+        ]
+        if missing:
+            return "failed", f"max condition incomplete: {', '.join(missing)}. {detail}".strip()
+        return "passed", detail or "declared max condition exercised"
     if not http_ok:
         return "failed", detail or "request failed"
     return "passed", detail or "observed"
@@ -610,9 +705,19 @@ class GpuSampler:
         return max(values) if values else None
 
 
-def _docker_python(container_id: str, script: str, args: list[str], timeout: float = 180) -> subprocess.CompletedProcess[str]:
+def _docker_python(
+    container_id: str,
+    script: str,
+    args: list[str],
+    timeout: float = 180,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    command = ["docker", "exec"]
+    for key, value in (env or {}).items():
+        command.extend(["-e", f"{key}={value}"])
+    command.extend(["-i", container_id, "python3", "-", *args])
     return subprocess.run(
-        ["docker", "exec", "-i", container_id, "python3", "-", *args],
+        command,
         input=script,
         capture_output=True,
         text=True,
@@ -662,29 +767,62 @@ def _usage_of(payload: dict[str, Any] | None) -> dict[str, Any] | None:
     return usage if isinstance(usage, dict) else None
 
 
-def _answer_text(payload: dict[str, Any] | None) -> str:
+def _choice(payload: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(payload, dict):
-        return ""
+        return {}
     choices = payload.get("choices")
-    if not isinstance(choices, list) or not choices:
-        return ""
-    message = choices[0].get("message") if isinstance(choices[0], dict) else None
+    if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+        return {}
+    return choices[0]
+
+
+def _message_fields(payload: dict[str, Any] | None) -> tuple[str, str]:
+    message = _choice(payload).get("message")
     if not isinstance(message, dict):
-        return ""
+        return "", ""
     content = message.get("content")
     reasoning = message.get("reasoning")
-    parts = [part for part in (content, reasoning) if isinstance(part, str) and part]
+    if not isinstance(reasoning, str):
+        reasoning = message.get("reasoning_content")
+    return (content if isinstance(content, str) else "", reasoning if isinstance(reasoning, str) else "")
+
+
+def _finish_reason(payload: dict[str, Any] | None) -> str | None:
+    reason = _choice(payload).get("finish_reason")
+    return reason if isinstance(reason, str) else None
+
+
+def _answer_text(payload: dict[str, Any] | None) -> str:
+    content, reasoning = _message_fields(payload)
+    parts = [part for part in (content, reasoning) if part]
     return "\n".join(parts)
 
 
+def _empty_observation(code: int, text: str, latency: float) -> dict[str, Any]:
+    return {
+        "code": code,
+        "payload": None,
+        "text": text,
+        "ttft_sec": None,
+        "latency_sec": latency,
+        "usage": None,
+        "output_tok_s": None,
+        "answer": "",
+        "content": "",
+        "reasoning": "",
+        "finish_reason": None,
+    }
+
+
 def _chat_observed(config: RunConfig, body: bytes) -> dict[str, Any]:
-    """Time to first byte and full latency. Stream responses keep the SSE text."""
+    """Latency plus SSE time-to-first-token. Non-streaming TTFT stays unset."""
     request = urllib.request.Request(
         f"{config.base_url}/v1/chat/completions",
         data=body,
         method="POST",
     )
     request.add_header("Content-Type", "application/json")
+    streaming = b'"stream":true' in body
     started = time.monotonic()
     ttft: float | None = None
     chunks: list[bytes] = []
@@ -692,18 +830,30 @@ def _chat_observed(config: RunConfig, body: bytes) -> dict[str, Any]:
     try:
         with urllib.request.urlopen(request, timeout=config.request_timeout_sec) as response:
             code = response.status
+            consumed = 0
             while True:
                 part = response.read(4096)
                 if not part:
                     break
-                if ttft is None:
-                    ttft = time.monotonic() - started
                 chunks.append(part)
+                if not streaming or ttft is not None:
+                    continue
+                pending = b"".join(chunks)
+                while True:
+                    split = pending.find(b"\n\n", consumed)
+                    if split < 0:
+                        break
+                    event = pending[consumed:split].decode("utf-8", errors="replace")
+                    consumed = split + 2
+                    if sse_event_has_token(event):
+                        ttft = time.monotonic() - started
+                        break
     except urllib.error.HTTPError as exc:
         code = exc.code
         chunks.append(exc.read())
-        if ttft is None:
-            ttft = time.monotonic() - started
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        latency = time.monotonic() - started
+        return _empty_observation(0, str(exc), latency)
     latency = time.monotonic() - started
     raw = b"".join(chunks)
     text = raw.decode("utf-8", errors="replace")
@@ -722,15 +872,19 @@ def _chat_observed(config: RunConfig, body: bytes) -> dict[str, Any]:
             completion = int(usage.get("completion_tokens") or 0)
         except (TypeError, ValueError):
             completion = 0
+    content, reasoning = _message_fields(payload)
     return {
         "code": code,
         "payload": payload,
         "text": text,
-        "ttft_sec": ttft,
+        "ttft_sec": ttft if streaming else None,
         "latency_sec": latency,
         "usage": usage,
         "output_tok_s": (completion / latency) if latency > 0 and completion else None,
         "answer": _answer_text(payload),
+        "content": content,
+        "reasoning": reasoning,
+        "finish_reason": _finish_reason(payload),
     }
 
 
@@ -1046,20 +1200,10 @@ def execute_suite(config: RunConfig) -> list[CaseResult]:
         build_chat_request(config.served_model, kind="multi_image", images=2, text="Describe the images.", max_tokens=64),
         require_image=True,
     )
-    quality = chat_case(
-        "quality_image",
-        build_chat_request(
-            config.served_model,
-            kind="image",
-            images=1,
-            text="Read the table. Reply with the four numbers in row-major order.",
-            max_tokens=64,
-            image_url=table_image_data_url(),
-        ),
-        require_image=True,
-    )
-    if quality is not None:
-        measurements["quality_answer"] = quality.get("answer") or quality.get("text", "")[:500]
+    if load_ok:
+        results.append(_run_quality(config, measurements)["case"])
+    else:
+        results.append(_blocked("quality_image", load_body, config))
 
     backend_status, backend_detail = judge_case("backend_record", http_ok=load_ok, evidence=evidence, detail=logs[-1000:])
     results.append(_case("backend_record", backend_status, backend_detail, config))
@@ -1228,40 +1372,536 @@ def _run_long_context(
     results.append(_case("long_context", status_name, detail, config))
 
 
+def cap_png_bytes(width: int = CAP_IMAGE_WIDTH, height: int = CAP_IMAGE_HEIGHT) -> bytes:
+    """Grid PNG larger than max_pixels. A regular grid compresses to a few kilobytes."""
+    raw = bytearray()
+    for y in range(height):
+        raw.append(0)
+        row_on = (y % 32) < 2
+        for x in range(width):
+            raw.append(0 if row_on or (x % 32) < 2 else 255)
+    return b"".join(
+        [
+            b"\x89PNG\r\n\x1a\n",
+            _png_chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 0, 0, 0, 0)),
+            _png_chunk(b"IDAT", zlib.compress(bytes(raw), 9)),
+            _png_chunk(b"IEND", b""),
+        ]
+    )
+
+
+def cap_image_data_url() -> str:
+    return "data:image/png;base64," + base64.b64encode(cap_png_bytes()).decode("ascii")
+
+
+def _replace_request(measurements: dict[str, Any], record: dict[str, Any]) -> None:
+    requests = measurements.setdefault("requests", [])
+    for index, item in enumerate(requests):
+        if isinstance(item, dict) and item.get("id") == record.get("id"):
+            requests[index] = record
+            return
+    requests.append(record)
+
+
+def _usage_int(usage: dict[str, Any] | None, key: str) -> int:
+    if not isinstance(usage, dict):
+        return 0
+    try:
+        return int(usage.get(key) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+_MAX_PROMPT_SCRIPT = r"""
+import base64, io, json, sys
+from PIL import Image
+from transformers import AutoTokenizer
+from transformers.models.qwen2_vl.image_processing_qwen2_vl import smart_resize
+
+png_b64 = sys.argv[1]
+max_pixels = int(sys.argv[2])
+floor = int(sys.argv[3])
+limit = int(sys.argv[4])
+image_count = int(sys.argv[5])
+target = int(sys.argv[6])
+forced = int(sys.argv[7])
+image = Image.open(io.BytesIO(base64.b64decode(png_b64)))
+width, height = image.size
+cfg = json.load(open("/models/qwen3.8-27b/config.json"))
+vision = cfg["vision_config"]
+pre = json.load(open("/models/qwen3.8-27b/preprocessor_config.json"))
+factor = vision["patch_size"] * vision["spatial_merge_size"]
+resized_h, resized_w = smart_resize(
+    height=height,
+    width=width,
+    factor=factor,
+    min_pixels=pre["size"]["shortest_edge"],
+    max_pixels=max_pixels,
+)
+grid_h = resized_h // vision["patch_size"]
+grid_w = resized_w // vision["patch_size"]
+vision_tokens = (grid_h * grid_w) // (vision["spatial_merge_size"] ** 2)
+tok = AutoTokenizer.from_pretrained("/models/qwen3.8-27b", trust_remote_code=True)
+pad_id = tok.convert_tokens_to_ids("<|image_pad|>")
+unit = "한국어 문맥 확인용 문장입니다. "
+instruction = "\n출력 한도에 도달할 때까지 번호를 이어서 쓰세요."
+
+def prompt_tokens(repeats: int) -> tuple[int, str]:
+    text = (unit * repeats) + instruction
+    content = [{"type": "image"} for _ in range(image_count)]
+    content.append({"type": "text", "text": text})
+    encoded = tok.apply_chat_template(
+        [{"role": "user", "content": content}],
+        add_generation_prompt=True,
+        tokenize=True,
+    )
+    ids = encoded["input_ids"] if hasattr(encoded, "keys") else encoded
+    if hasattr(ids, "tolist"):
+        ids = ids.tolist()
+    if isinstance(ids, list) and ids and isinstance(ids[0], list):
+        ids = ids[0]
+    pads = sum(1 for token in ids if token == pad_id)
+    if pads != image_count:
+        raise SystemExit(f"image pad count {pads} != {image_count}")
+    return len(ids) + pads * (vision_tokens - 1), text
+
+if forced > 0:
+    count, text = prompt_tokens(forced)
+    chosen = forced
+else:
+    lo, hi = 1, 12000
+    best = None
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        count, text = prompt_tokens(mid)
+        if floor <= count <= limit and (best is None or abs(count - target) < abs(best[0] - target)):
+            best = (count, text, mid)
+        if count < target:
+            lo = mid + 1
+        elif count > target:
+            hi = mid - 1
+        else:
+            break
+    if best is None:
+        raise SystemExit(f"no prompt landed in [{floor}, {limit}]")
+    count, text, chosen = best
+other, _other_text = prompt_tokens(chosen + 1)
+print(json.dumps({
+    "source_pixels": width * height,
+    "processed_width": resized_w,
+    "processed_height": resized_h,
+    "processed_pixels": resized_w * resized_h,
+    "vision_tokens": vision_tokens,
+    "prompt_tokens_estimate": count,
+    "repeats": chosen,
+    "unit_tokens": other - count,
+    "text": text,
+}))
+"""
+
+
+_GDN_SCRIPT = r"""
+import json, os
+from pathlib import Path
+import torch
+from transformers import AutoConfig
+from vllm.model_executor.layers.mamba.mamba_utils import MambaStateDtypeCalculator
+
+cmd = ""
+for pid in os.listdir("/proc"):
+    if not pid.isdigit():
+        continue
+    try:
+        raw = Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\x00", b" ").decode("utf-8", "replace")
+    except OSError:
+        continue
+    if "vllm" in raw and "serve" in raw:
+        cmd = raw
+        break
+if not cmd:
+    raise SystemExit("vllm serve process was not found")
+
+def flag(name: str, default: str) -> str:
+    parts = cmd.split()
+    if name not in parts:
+        return default
+    index = parts.index(name)
+    if index + 1 >= len(parts):
+        return default
+    return parts[index + 1]
+
+model_dtype_name = flag("--dtype", "bfloat16")
+cache_dtype = flag("--mamba-cache-dtype", "auto")
+ssm_dtype = flag("--mamba-ssm-cache-dtype", "auto")
+cfg = AutoConfig.from_pretrained("/models/qwen3.8-27b", trust_remote_code=True)
+text_cfg = cfg.get_text_config() if hasattr(cfg, "get_text_config") else cfg
+hf_ssm = getattr(text_cfg, "mamba_ssm_dtype", None)
+if ssm_dtype == "auto" and isinstance(hf_ssm, str) and hf_ssm:
+    ssm_dtype = hf_ssm
+torch_dtype = {"bfloat16": torch.bfloat16, "float16": torch.float16, "float32": torch.float32}[model_dtype_name]
+conv, recurrent = MambaStateDtypeCalculator.gated_delta_net_state_dtype(torch_dtype, cache_dtype, ssm_dtype)
+line = f"mamba cache dtype {conv} ssm state dtype {recurrent}"
+print(line)
+print(json.dumps({
+    "line": line,
+    "conv": str(conv),
+    "recurrent": str(recurrent),
+    "cache_dtype": cache_dtype,
+    "ssm_dtype": ssm_dtype,
+    "model_dtype": model_dtype_name,
+}))
+"""
+
+
+def _load_json_stdout(result: subprocess.CompletedProcess[str]) -> dict[str, Any]:
+    if result.returncode != 0:
+        raise RuntimeError((result.stderr or result.stdout or "container python failed")[-800:])
+    lines = [line for line in result.stdout.splitlines() if line.strip().startswith("{")]
+    if not lines:
+        raise RuntimeError(result.stdout[-800:] or "container python returned no json")
+    try:
+        payload = json.loads(lines[-1])
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(result.stdout[-800:]) from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError("container python returned a non-object")
+    return payload
+
+
+def _prepare_max_prompt(container_id: str, repeats: int = 0) -> dict[str, Any]:
+    floor = LONG_CONTEXT_TARGET_TOKENS - MAX_OUTPUT_BUDGET
+    limit = CONTEXT_LIMIT_TOKENS - MAX_OUTPUT_BUDGET
+    target = (floor + limit) // 2
+    result = _docker_python(
+        container_id,
+        _MAX_PROMPT_SCRIPT,
+        [
+            base64.b64encode(cap_png_bytes()).decode("ascii"),
+            str(MAX_PIXELS),
+            str(floor),
+            str(limit),
+            "4",
+            str(target),
+            str(repeats),
+        ],
+        timeout=180,
+        env={"CUDA_VISIBLE_DEVICES": ""},
+    )
+    return _load_json_stdout(result)
+
+
+def _probe_gdn_state_dtype(container_id: str) -> dict[str, Any]:
+    result = subprocess.run(
+        ["docker", "exec", "-e", "CUDA_VISIBLE_DEVICES=", "-i", container_id, "python3", "-"],
+        input=_GDN_SCRIPT,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+    payload = _load_json_stdout(result)
+    phrases = gdn_state_dtype_phrases(str(payload.get("line") or ""))
+    if not phrases:
+        raise RuntimeError(f"gdn probe did not report a state dtype: {payload}")
+    payload["phrases"] = phrases
+    return payload
+
+
+def _quality_body(config: RunConfig, max_tokens: int) -> bytes:
+    return build_chat_request(
+        config.served_model,
+        kind="image",
+        images=1,
+        text="Read the table. Reply with the four numbers in row-major order.",
+        max_tokens=max_tokens,
+        image_url=table_image_data_url(),
+    )
+
+
+def _run_quality(config: RunConfig, measurements: dict[str, Any]) -> dict[str, Any]:
+    """Ask for the four table numbers. Retry once at 4096 when reasoning consumes 2048."""
+    used_tokens = QUALITY_FIRST_TOKENS
+    body = _quality_body(config, used_tokens)
+    observed = _chat_observed(config, body)
+    if quality_should_retry(observed.get("content"), observed.get("finish_reason")):
+        used_tokens = MAX_OUTPUT_BUDGET
+        body = _quality_body(config, used_tokens)
+        observed = _chat_observed(config, body)
+    content = observed.get("content") if isinstance(observed.get("content"), str) else ""
+    accepted = table_numbers_in_content(content)
+    http_ok = observed["code"] == 200 and _openai_ok(observed.get("payload"))
+    evidence = {"table_answer": "content"} if accepted else {}
+    detail = (
+        f"max_tokens={used_tokens} finish={observed.get('finish_reason')} "
+        f"content={content[:300]!r} reasoning={(observed.get('reasoning') or '')[:180]!r}"
+    )
+    status_name, judged = judge_case("quality_image", http_ok=http_ok, evidence=evidence, detail=detail)
+    _replace_request(
+        measurements,
+        {
+            "id": "quality_image",
+            "code": observed["code"],
+            "ttft_sec": None,
+            "ttft_method": "not_applicable_non_streaming",
+            "latency_sec": observed["latency_sec"],
+            "output_tok_s": observed["output_tok_s"],
+            "usage": observed["usage"],
+            "finish_reason": observed.get("finish_reason"),
+            "content": content[:2000],
+            "reasoning": (observed.get("reasoning") or "")[:2000],
+            "answer": content[:2000],
+            "max_tokens": used_tokens,
+            "table_answer": accepted,
+        },
+    )
+    measurements["quality_answer"] = content[:2000]
+    measurements["quality_request_body"] = body.decode("utf-8")
+    return {
+        "case": _case("quality_image", status_name, judged, config),
+        "accepted": accepted,
+        "body": body,
+        "content": content,
+        "finish_reason": observed.get("finish_reason"),
+        "max_tokens": used_tokens,
+    }
+
+
+def _watch_metrics(container_id: str, seconds: float) -> tuple[subprocess.Popen[str], list[str], threading.Thread]:
+    script = (
+        "import time, urllib.request\n"
+        f"deadline = time.time() + {seconds}\n"
+        "while time.time() < deadline:\n"
+        "    try:\n"
+        "        data = urllib.request.urlopen('http://127.0.0.1:8080/metrics', timeout=2).read().decode()\n"
+        "    except Exception as exc:\n"
+        "        print(f'ERR {exc}', flush=True)\n"
+        "        time.sleep(2)\n"
+        "        continue\n"
+        "    kept = ''\n"
+        "    for line in data.splitlines():\n"
+        "        if line.startswith('vllm:num_preemptions_total') or line.startswith('vllm:num_preemptions{') or line.startswith('vllm:num_preemptions '):\n"
+        "            kept = line\n"
+        "            break\n"
+        "    print(kept or 'MISSING', flush=True)\n"
+        "    time.sleep(2)\n"
+    )
+    proc = subprocess.Popen(
+        ["docker", "exec", "-i", container_id, "python3", "-"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    assert proc.stdin is not None and proc.stdout is not None
+    chunks: list[str] = []
+
+    def _drain() -> None:
+        assert proc.stdout is not None
+        collected: list[str] = []
+        for line in proc.stdout:
+            collected.append(line)
+        chunks.append("".join(collected))
+
+    proc.stdin.write(script)
+    proc.stdin.close()
+    reader = threading.Thread(target=_drain, name="max-metrics", daemon=True)
+    reader.start()
+    return proc, chunks, reader
+
+
+def _run_parallel_chat(config: RunConfig, bodies: list[bytes]) -> list[dict[str, Any]]:
+    ordered: list[dict[str, Any] | None] = [None] * len(bodies)
+    with ThreadPoolExecutor(max_workers=max(1, len(bodies))) as pool:
+        futures = {pool.submit(_chat_observed, config, body): index for index, body in enumerate(bodies)}
+        for future in as_completed(futures):
+            ordered[futures[future]] = future.result()
+    return [item if item is not None else _empty_observation(0, "missing observation", 0.0) for item in ordered]
+
+
 def _run_multimodal_max(
     config: RunConfig,
     container_id: str,
     results: list[CaseResult],
     measurements: dict[str, Any],
 ) -> None:
+    """Exercise 4 images at the pixel cap, a near-32K budget, 4096 outputs, and concurrency 4."""
     _code, status = _status(config)
     if status.get("state") != "ready":
         load_code, load_body = _post_control(config, "load", config.load_timeout_sec)
         if load_code != 200:
             results.append(_case("multimodal_max", "failed", f"model was not ready for the max case: {load_body}", config))
+            measurements["multimodal_max"] = {"ok": False, "reason": "not ready"}
+            measurements["inference_peak_mib"] = None
             return
-    output_budget = 256
-    bodies = [
-        build_chat_request(
+    try:
+        prepared = _prepare_max_prompt(container_id)
+    except RuntimeError as exc:
+        results.append(_case("multimodal_max", "failed", f"max prompt was not built: {exc}", config))
+        measurements["multimodal_max"] = {"ok": False, "reason": str(exc)[:500]}
+        measurements["inference_peak_mib"] = None
+        return
+    if not pixels_hit_cap(int(prepared["source_pixels"]), int(prepared["processed_pixels"])):
+        results.append(
+            _case(
+                "multimodal_max",
+                "failed",
+                f"processor did not bind max_pixels: {prepared['source_pixels']} -> {prepared['processed_pixels']}",
+                config,
+            )
+        )
+        measurements["multimodal_max"] = {"ok": False, "processor": prepared}
+        measurements["inference_peak_mib"] = None
+        return
+    image_url = cap_image_data_url()
+    calibrate_config = replace(config, request_timeout_sec=MULTIMODAL_MAX_TIMEOUT_SEC)
+
+    def _one(text: str, max_tokens: int) -> bytes:
+        return build_chat_request(
             config.served_model,
             kind="multi_image",
-            images=config.image_count,
-            max_tokens=output_budget,
-            text="Read every image in this request.",
-            image_url=table_image_data_url(),
+            images=4,
+            max_tokens=max_tokens,
+            text=text,
+            image_url=image_url,
         )
-        for _ in range(4)
-    ]
-    ok, note, wave_evidence, elapsed = _run_parallel_observed(config, bodies, container_id)
-    wave_evidence.update(evidence_from_text(_logs(container_id, "1s")))
-    status_name, detail = judge_case(
-        "multimodal_max",
-        http_ok=ok and all(b"image_url" in body for body in bodies) and all(body.count(b"image_url") >= config.image_count for body in bodies),
-        evidence=wave_evidence,
-        detail=f"images={config.image_count} max_tokens={output_budget} concurrency=4 elapsed={elapsed:.1f}s {note}",
+
+    text = str(prepared["text"])
+    probe = _chat_observed(calibrate_config, _one(text, 1))
+    server_prompt = _usage_int(probe.get("usage"), "prompt_tokens")
+    if probe["code"] != 200 or not output_budget_fits(server_prompt):
+        unit = int(prepared.get("unit_tokens") or 0)
+        repeats = int(prepared.get("repeats") or 0)
+        if unit <= 0 or repeats <= 0 or server_prompt <= 0:
+            results.append(
+                _case(
+                    "multimodal_max",
+                    "failed",
+                    f"calibration did not land in the context window: code={probe['code']} prompt={server_prompt} estimate={prepared.get('prompt_tokens_estimate')}",
+                    config,
+                )
+            )
+            measurements["multimodal_max"] = {"ok": False, "calibration": {"code": probe["code"], "prompt_tokens": server_prompt}}
+            measurements["inference_peak_mib"] = None
+            return
+        target = (LONG_CONTEXT_TARGET_TOKENS + CONTEXT_LIMIT_TOKENS) // 2 - MAX_OUTPUT_BUDGET
+        adjusted = max(1, repeats + round((target - server_prompt) / unit))
+        try:
+            prepared = _prepare_max_prompt(container_id, adjusted)
+        except RuntimeError as exc:
+            results.append(_case("multimodal_max", "failed", f"adjusted prompt was not built: {exc}", config))
+            measurements["inference_peak_mib"] = None
+            return
+        text = str(prepared["text"])
+        probe = _chat_observed(calibrate_config, _one(text, 1))
+        server_prompt = _usage_int(probe.get("usage"), "prompt_tokens")
+        if probe["code"] != 200 or not output_budget_fits(server_prompt):
+            results.append(
+                _case(
+                    "multimodal_max",
+                    "failed",
+                    f"adjusted calibration is outside the context window: code={probe['code']} prompt={server_prompt}",
+                    config,
+                )
+            )
+            measurements["multimodal_max"] = {"ok": False, "calibration": {"code": probe["code"], "prompt_tokens": server_prompt}}
+            measurements["inference_peak_mib"] = None
+            return
+    bodies = [_one(text, MAX_OUTPUT_BUDGET) for _ in range(4)]
+    if any(len(body) > 32 * 1024 * 1024 for body in bodies):
+        results.append(_case("multimodal_max", "failed", "max request body exceeds 32MiB", config))
+        measurements["inference_peak_mib"] = None
+        return
+    before_metrics = _metrics_text(container_id)
+    before_preempt = _metric_value(before_metrics, "vllm:num_preemptions")
+    watcher, chunks, reader = _watch_metrics(container_id, MULTIMODAL_MAX_TIMEOUT_SEC)
+    sampler = GpuSampler()
+    window_start = time.time()
+    sampler.start()
+    try:
+        observations = _run_parallel_chat(calibrate_config, bodies)
+    finally:
+        window_end = time.time()
+        sampler.stop()
+        watcher.kill()
+        reader.join(timeout=5)
+    host_peak = sampler.peak_between(window_start, window_end)
+    spot = _gpu_used_mib()
+    if spot is not None:
+        host_peak = spot if host_peak is None else max(host_peak, spot)
+    blob = chunks[0] if chunks else ""
+    samples = _metric_samples(blob, "vllm:num_preemptions")
+    if before_preempt is None and samples:
+        before_preempt = 0.0
+    since = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(window_start - 2))
+    logs = _logs(container_id, since)
+    oom = "out of memory" in (blob + logs).lower() or any("out of memory" in item["text"].lower() for item in observations)
+    preemption = before_preempt is not None and any(value > before_preempt for value in samples)
+    preemption_clear = before_preempt is not None and bool(samples) and not preemption
+    summaries = []
+    output_ok = True
+    context_ok = True
+    http_ok = True
+    for item in observations:
+        prompt = _usage_int(item.get("usage"), "prompt_tokens")
+        completion = _usage_int(item.get("usage"), "completion_tokens")
+        finish = item.get("finish_reason")
+        summaries.append(
+            {
+                "code": item["code"],
+                "prompt_tokens": prompt,
+                "completion_tokens": completion,
+                "finish_reason": finish,
+                "latency_sec": item["latency_sec"],
+            }
+        )
+        http_ok = http_ok and item["code"] == 200 and _openai_ok(item.get("payload"))
+        output_ok = output_ok and completion == MAX_OUTPUT_BUDGET and finish == "length"
+        context_ok = context_ok and output_budget_fits(prompt)
+    evidence: dict[str, str] = {}
+    if oom:
+        evidence["oom"] = "log"
+    if preemption:
+        evidence["preemption"] = "metrics"
+    if pixels_hit_cap(int(prepared["source_pixels"]), int(prepared["processed_pixels"])):
+        evidence["pixels"] = "processor"
+    if context_ok:
+        evidence["context_tokens"] = "usage"
+    if output_ok:
+        evidence["output_budget"] = "usage"
+    if len(bodies) == 4 and all(body.count(b"image_url") >= 4 for body in bodies):
+        evidence["concurrency"] = "requests"
+    if preemption_clear:
+        evidence["preemption_clear"] = "metrics"
+    detail = (
+        f"processed_pixels={prepared.get('processed_pixels')} source_pixels={prepared.get('source_pixels')} "
+        f"calibration_prompt={server_prompt} preemption_before={before_preempt} "
+        f"preemption_samples={samples[:8]} peak_mib={host_peak} requests={summaries}"
     )
-    measurements["multimodal_max"] = {"ok": ok, "elapsed_sec": elapsed, "note": note[:500]}
-    results.append(_case("multimodal_max", status_name, detail, config))
+    status_name, judged = judge_case(
+        "multimodal_max",
+        http_ok=http_ok and not oom,
+        evidence=evidence,
+        detail=detail,
+    )
+    measurements["multimodal_max"] = {
+        "ok": status_name == "passed",
+        "elapsed_sec": window_end - window_start,
+        "processor": {
+            "source_pixels": prepared.get("source_pixels"),
+            "processed_width": prepared.get("processed_width"),
+            "processed_height": prepared.get("processed_height"),
+            "processed_pixels": prepared.get("processed_pixels"),
+            "vision_tokens": prepared.get("vision_tokens"),
+        },
+        "calibration_prompt_tokens": server_prompt,
+        "requests": summaries,
+        "host_peak_mib": host_peak,
+        "preemption_before": before_preempt,
+        "preemption_clear": preemption_clear,
+    }
+    measurements["inference_peak_mib"] = host_peak
+    measurements["inference_peak_note"] = "host nvidia-smi peak during the multimodal max window"
+    results.append(_case("multimodal_max", status_name, judged, config))
 
 
 def _client_and_busy(config: RunConfig, load_ok: bool, load_body: object) -> list[CaseResult]:
@@ -1629,7 +2269,11 @@ def _compose_with_profile(root: Path, profile: str | None) -> subprocess.Complet
     )
 
 
-def run_comparison(config: RunConfig) -> dict[str, Any]:
+def run_comparison(
+    config: RunConfig,
+    quality_body: bytes | None = None,
+    fp8_quality: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Measure the BF16 KV profile without replacing the default FP8 profile."""
     record: dict[str, Any] = {"profile": "qwen3.8-27b-kv-bf16", "status": "not_run"}
     try:
@@ -1665,21 +2309,31 @@ def run_comparison(config: RunConfig) -> dict[str, Any]:
         _note_kv_scale(evidence, logs)
         record["kv_evidence"] = evidence
         if load_code == 200 and isinstance(load_body, dict) and load_body.get("state") == "ready":
-            observed = _chat_observed(
-                config,
-                build_chat_request(
-                    config.served_model,
-                    kind="text",
-                    max_tokens=32,
-                    text="한국어로 한 문장만 답하세요.",
-                ),
-            )
-            record["chat"] = {
-                "code": observed["code"],
-                "latency_sec": observed["latency_sec"],
-                "ttft_sec": observed["ttft_sec"],
-                "answer": (observed["answer"] or "")[:300],
-            }
+            if not quality_body:
+                record["quality"] = {
+                    "status": "not_run",
+                    "reason": "no quality request body",
+                    "fp8_accepted": None if fp8_quality is None else fp8_quality.get("accepted"),
+                }
+            else:
+                observed = _chat_observed(
+                    replace(config, request_timeout_sec=max(config.request_timeout_sec, 900)),
+                    quality_body,
+                )
+                bf16_content = observed.get("content") if isinstance(observed.get("content"), str) else ""
+                record["quality"] = {
+                    "status": "measured",
+                    "fp8_content": None if fp8_quality is None else (fp8_quality.get("content") or "")[:2000],
+                    "fp8_accepted": None if fp8_quality is None else bool(fp8_quality.get("accepted")),
+                    "bf16_content": bf16_content[:2000],
+                    "bf16_reasoning": (observed.get("reasoning") or "")[:2000],
+                    "bf16_accepted": table_numbers_in_content(bf16_content),
+                    "bf16_code": observed["code"],
+                    "bf16_finish_reason": observed.get("finish_reason"),
+                    "bf16_usage": observed.get("usage"),
+                    "bf16_latency_sec": observed["latency_sec"],
+                    "ttft_sec": None,
+                }
             unload_started = time.time()
             unload_code, _unload_body = _post_control(config, "unload", 60)
             record["unload_sec"] = time.time() - unload_started
@@ -1700,10 +2354,254 @@ def run_comparison(config: RunConfig) -> dict[str, Any]:
     return record
 
 
+def _clear_nonstream_ttft(measurements: dict[str, Any]) -> None:
+    for item in measurements.get("requests", []):
+        if not isinstance(item, dict) or item.get("id") == "text_stream":
+            continue
+        item["ttft_sec"] = None
+        item["ttft_method"] = "not_applicable_non_streaming"
+
+
+def _remeasure_stream_ttft(config: RunConfig, measurements: dict[str, Any]) -> dict[str, Any]:
+    observed = _chat_observed(
+        config,
+        build_chat_request(
+            config.served_model,
+            kind="text",
+            stream=True,
+            max_tokens=32,
+            text="Reply with the single word ok.",
+        ),
+    )
+    for item in measurements.get("requests", []):
+        if isinstance(item, dict) and item.get("id") == "text_stream":
+            item["ttft_sec"] = observed["ttft_sec"]
+            item["ttft_method"] = "sse_first_token"
+            item["latency_sec"] = observed["latency_sec"]
+    measurements["ttft"] = {
+        "method": "sse_first_token",
+        "text_stream_sec": observed["ttft_sec"],
+        "code": observed["code"],
+    }
+    return observed
+
+
+def _merge_cases(updates: list[CaseResult]) -> None:
+    payload = json.loads(OUTPUT.read_text(encoding="utf-8"))
+    pending = {item.id: item for item in updates}
+    for case in payload.get("cases", []):
+        item = pending.pop(case.get("id"), None)
+        if item is None:
+            continue
+        case["status"] = item.status
+        case["detail"] = item.detail
+    for item in pending.values():
+        payload.setdefault("cases", []).append({"id": item.id, "status": item.status, "detail": item.detail})
+    statuses = [case.get("status") for case in payload.get("cases", [])]
+    if any(status == "failed" for status in statuses):
+        suite = "failed"
+    elif statuses and all(status == "passed" for status in statuses):
+        suite = "passed"
+    else:
+        suite = "not_run"
+    payload["status"] = suite
+    payload["gpu_inference_success"] = suite == "passed"
+    payload["finished_at"] = utc_now()
+    OUTPUT.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def write_connection(
+    config: RunConfig,
+    *,
+    confirmed: bool,
+    host_peak: int | None,
+    baseline: int | None,
+    reason: str,
+) -> None:
+    profile: dict[str, Any] = {"profileId": "qwen3.8-27b-fp8-kv", "confirmed": confirmed}
+    if confirmed and host_peak is not None and baseline is not None and host_peak >= baseline:
+        profile["inferencePeakBytes"] = (host_peak - baseline) * _MIB
+        profile["inferencePeakHostMiB"] = host_peak
+        profile["baselineMiB"] = baseline
+        profile["maxConcurrency"] = 4
+        profile["limits"] = {
+            "maxPixels": MAX_PIXELS,
+            "maxOutputTokens": MAX_OUTPUT_BUDGET,
+            "maxImagesPerPrompt": 4,
+        }
+    else:
+        profile["confirmed"] = False
+        profile["unconfirmed"] = ["maxConcurrency", "maxPixels", "maxOutputTokens", "inferencePeakBytes"]
+        profile["reason"] = reason
+    payload = {
+        "baseURL": config.base_url,
+        "inferencePath": "/v1/chat/completions",
+        "servedModel": config.served_model,
+        "prepare": {"argv": [str(PREPARE.resolve())]},
+        "resourceProfile": profile,
+    }
+    CONNECTION.parent.mkdir(parents=True, exist_ok=True)
+    CONNECTION.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def _write_stage_notes(lines: list[str]) -> None:
+    path = ROOT / "local" / "stage2_notes.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+
+
+def _ensure_model_ready(config: RunConfig) -> tuple[bool, str]:
+    started = _compose(config.root, ["up", "-d", "--no-build", "--no-recreate", config.service])
+    if started.returncode != 0:
+        return False, (started.stderr or started.stdout or "compose up failed")[-500:]
+    if not _wait_http(config, timeout=60):
+        return False, "controller health did not answer"
+    _code, status = _status(config)
+    if status.get("state") == "ready" and status.get("residency") == "resident":
+        return True, "already ready"
+    load_code, load_body = _post_control(config, "load", config.load_timeout_sec)
+    ready = load_code == 200 and isinstance(load_body, dict) and load_body.get("state") == "ready"
+    return ready, str(load_body)
+
+
+def run_supplement(config: RunConfig, *, skip_comparison: bool = False) -> int:
+    """Rerun the missing stage-2 measurements without the lifecycle cases."""
+    print("supplement: load existing measurements", flush=True)
+    measurements: dict[str, Any] = {}
+    loaded_measurements = False
+    if MEASUREMENTS.exists():
+        measurements = json.loads(MEASUREMENTS.read_text(encoding="utf-8"))
+        loaded_measurements = True
+    notes = [
+        "# 2단계 보완 기록",
+        "",
+        "작성 시각은 이 실행이 끝난 시점이다. README와 benchmarks/README.md는 수정하지 않았다. git 명령은 실행하지 않았다.",
+        "",
+        "통과해 있던 load/unload 반복, failure, container restart는 다시 실행하지 않았다.",
+        "",
+        "품질 요청은 thinking을 끄지 않았다. 2048토큰에서 content가 비고 finish_reason이 length이면 4096으로 한 번 더 보낸다.",
+        "",
+        "연결 정보의 정본은 tests/outputs/inferswap_connection.json 이다. prepare.argv는 이 저장소 prepare-inferswap의 절대 경로 하나다.",
+        "benchmarks/README.md의 prepare.argv는 vllm serve로 남아 있다. 그 파일은 고치지 말라는 지시를 따랐다.",
+        "",
+    ]
+    updates: list[CaseResult] = []
+    comparison: dict[str, Any] | None = None
+    exit_code = 1
+    try:
+        baseline = _gpu_used_mib()
+        measurements["supplement_baseline_mib"] = baseline
+        print(f"supplement: baseline {baseline} MiB", flush=True)
+        ready, ready_detail = _ensure_model_ready(config)
+        notes.append(f"FP8 load: ready={ready} detail={ready_detail[:400]}")
+        if not ready:
+            notes.append("모델을 올리지 못해 GDN, TTFT, 품질, 최대 조건을 실행하지 못했다.")
+            write_connection(config, confirmed=False, host_peak=None, baseline=baseline, reason="model did not become ready")
+            return 1
+        container_id = _owned_container(config.root, config.service)
+        print("supplement: gdn state dtype", flush=True)
+        try:
+            probe = _probe_gdn_state_dtype(container_id)
+        except RuntimeError as exc:
+            probe = None
+            notes.append(f"GDN state dtype probe 실패: {exc}")
+            evidence = dict(measurements.get("backend_evidence") or {})
+            evidence["gdn_dtype"] = ""
+            measurements["backend_evidence"] = evidence
+            status_name, detail = judge_case("backend_record", http_ok=True, evidence=evidence, detail=str(exc))
+            updates.append(_case("backend_record", status_name, detail, config))
+        else:
+            evidence = dict(measurements.get("backend_evidence") or {})
+            evidence["gdn_dtype"] = "probe"
+            measurements["backend_evidence"] = evidence
+            measurements["gdn_state_dtype"] = probe
+            notes.append(
+                f"GDN state dtype는 기동 로그에 없어 워커 argv와 Qwen3.5 설정으로 계산했다. "
+                f"conv={probe.get('conv')} recurrent={probe.get('recurrent')} "
+                f"cache={probe.get('cache_dtype')} ssm={probe.get('ssm_dtype')}"
+            )
+            status_name, detail = judge_case(
+                "backend_record",
+                http_ok=True,
+                evidence=evidence,
+                detail=str(probe.get("line")),
+            )
+            updates.append(_case("backend_record", status_name, detail, config))
+        print("supplement: sse ttft", flush=True)
+        _clear_nonstream_ttft(measurements)
+        ttft = _remeasure_stream_ttft(config, measurements)
+        notes.append(
+            f"TTFT는 SSE의 첫 비어 있지 않은 content/reasoning 토큰만 기록한다. "
+            f"text_stream={ttft.get('ttft_sec')} code={ttft.get('code')}. 비스트리밍 ttft_sec는 null이다."
+        )
+        print("supplement: quality image", flush=True)
+        quality = _run_quality(config, measurements)
+        updates.append(quality["case"])
+        notes.append(
+            f"품질: accepted={quality['accepted']} max_tokens={quality['max_tokens']} "
+            f"finish={quality['finish_reason']} content={quality['content'][:240]!r}"
+        )
+        print("supplement: multimodal max", flush=True)
+        before = len(updates)
+        _run_multimodal_max(config, container_id, updates, measurements)
+        max_case = updates[-1] if len(updates) > before else None
+        max_passed = max_case is not None and max_case.status == "passed" and max_case.id == "multimodal_max"
+        host_peak = measurements.get("inference_peak_mib")
+        peak_value = host_peak if isinstance(host_peak, int) else None
+        if max_passed:
+            reason = "multimodal max passed"
+        else:
+            reason = max_case.detail if max_case is not None else "multimodal max did not run"
+        notes.append(f"최대 조건: passed={max_passed} host_peak_mib={peak_value}")
+        if not max_passed:
+            notes.append(
+                "최대 조건이 통과하지 않았다. max_model_len, max_pixels, 출력 4096, max_num_seqs는 낮추지 않았다. "
+                "resourceProfile의 maxConcurrency, maxPixels, maxOutputTokens, inferencePeakBytes는 확정하지 않는다."
+            )
+        write_connection(
+            config,
+            confirmed=max_passed,
+            host_peak=peak_value,
+            baseline=baseline if isinstance(baseline, int) else None,
+            reason=reason[:500],
+        )
+        _save_measurements(measurements)
+        if OUTPUT.exists():
+            _merge_cases(updates)
+        if not skip_comparison:
+            print("supplement: bf16 quality comparison", flush=True)
+            comparison = run_comparison(config, quality["body"], {"content": quality["content"], "accepted": quality["accepted"]})
+            COMPARISON.write_text(json.dumps(comparison, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+            bf16 = comparison.get("quality") if isinstance(comparison.get("quality"), dict) else {}
+            notes.append(
+                f"BF16 비교 status={comparison.get('status')} "
+                f"fp8_accepted={bf16.get('fp8_accepted')} bf16_accepted={bf16.get('bf16_accepted')} "
+                f"bf16_content={str(bf16.get('bf16_content') or '')[:240]!r}"
+            )
+            notes.append("비교가 끝난 뒤 컨테이너는 기본 FP8 프로필로 되돌렸다. FP8 프로필을 BF16 결과로 바꾸지 않았다.")
+        failed = [item.id for item in updates if item.status != "passed"]
+        exit_code = 1 if failed else 0
+        notes.append(f"이번 보완에서 통과하지 않은 케이스: {failed or '없음'}")
+        return exit_code
+    except Exception as exc:
+        notes.append(f"보완 실행이 예외로 끝났다: {exc}")
+        exit_code = 1
+        return 1
+    finally:
+        notes.append("")
+        notes.append("lifecycle 재실행을 하지 않은 것은 계획된 생략이다. 품질 thinking을 끄지 않은 것도 계획된 선택이다.")
+        if comparison is None and not skip_comparison:
+            notes.append("BF16 비교 기록이 없으면 그 단계 전에 실행이 멈춘 것이다.")
+        if loaded_measurements:
+            _save_measurements(measurements)
+        _write_stage_notes(notes)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Independent GPU/API verification")
     parser.add_argument("--check-plan", action="store_true")
     parser.add_argument("--execute", action="store_true", help="Run the GPU/API cases against the compose service")
+    parser.add_argument("--supplement", action="store_true", help="Rerun max-condition, quality, TTFT, and GDN checks only")
     parser.add_argument("--base-url", default="")
     parser.add_argument("--service", default=SERVICE)
     parser.add_argument("--profile", default="qwen3.8-27b")
@@ -1715,7 +2613,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.check_plan:
         check_plan()
-    if not args.execute:
+    if not args.execute and not args.supplement:
         if not args.check_plan:
             print("GPU suite was not executed. Pass --execute to run it.", file=sys.stderr)
         return 0
@@ -1732,6 +2630,8 @@ def main(argv: list[str] | None = None) -> int:
         load_timeout_sec=args.load_timeout_sec,
         request_timeout_sec=args.request_timeout_sec,
     )
+    if args.supplement:
+        return run_supplement(config, skip_comparison=args.skip_comparison)
     results = execute_suite(config)
     write_execution(results, started)
     if not args.skip_comparison:
