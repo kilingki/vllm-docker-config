@@ -1,0 +1,33 @@
+{
+  "name": "llm-off",
+  "http_status": 200,
+  "e2e_sec": 0.255,
+  "finish_reason": "stop",
+  "content": "391",
+  "reasoning_content": "",
+  "content_chars": 3,
+  "reasoning_chars": 0,
+  "usage": {
+    "prompt_tokens": 32,
+    "completion_tokens": 4,
+    "total_tokens": 36
+  },
+  "timings": {
+    "prompt_n": null,
+    "prompt_ms": null,
+    "prompt_per_second": null,
+    "predicted_n": null,
+    "predicted_ms": null,
+    "predicted_per_second": null
+  },
+  "request": {
+    "kind": "llm",
+    "prompt": "What is 17 times 23? Reply with the number only in the final answer.",
+    "max_tokens": 768,
+    "temperature": 0,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    }
+  },
+  "error": null
+}

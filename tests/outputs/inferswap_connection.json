@@ -9,13 +9,15 @@
   },
   "resourceProfile": {
     "profileId": "qwen3.8-27b-fp8-kv",
-    "confirmed": false,
-    "unconfirmed": [
-      "maxConcurrency",
-      "maxPixels",
-      "maxOutputTokens",
-      "inferencePeakBytes"
-    ],
-    "reason": "max condition incomplete: output_budget. processed_pixels=262144 source_pixels=589824 calibration_prompt=27290 preemption_before=0.0 preemption_samples=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] peak_mib=23613 requests=[{'code': 200, 'prompt_tokens': 27290, 'completion_tokens': 4096, 'finish_reason': 'length', 'latency_sec': 124.04300576300011}, {'code': 200, 'prompt_tokens': 27290, 'completion_tokens': 4096, 'finish_reason': 'length', 'latency_sec': 124.08421794899914}, {'code': 200, 'prompt_toke"
+    "confirmed": true,
+    "inferencePeakBytes": 23757586432,
+    "inferencePeakHostMiB": 23777,
+    "baselineMiB": 1120,
+    "maxConcurrency": 4,
+    "limits": {
+      "maxPixels": 262144,
+      "maxOutputTokens": 4096,
+      "maxImagesPerPrompt": 4
+    }
   }
 }

@@ -1,0 +1,9 @@
+{
+  "http_status": 200,
+  "body": {
+    "state": "ready",
+    "residency": "resident",
+    "active_requests": 0,
+    "last_error": null
+  }
+}

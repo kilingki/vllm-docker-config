@@ -219,6 +219,7 @@ def build_chat_request(
     text: str = "Reply with the single word ok.",
     stream: bool = False,
     max_tokens: int = 16,
+    min_tokens: int | None = None,
     long_context_tokens: int = 0,
     image_url: str | None = None,
 ) -> bytes:
@@ -242,12 +243,14 @@ def build_chat_request(
         parts.append({"type": "image_url", "image_url": {"url": image_url or image_data_url()}})
     parts.append({"type": "text", "text": text})
     content: Any = text if images == 0 else parts
-    payload = {
+    payload: dict[str, Any] = {
         "model": served_model,
         "messages": [{"role": "user", "content": content}],
         "max_tokens": max_tokens,
         "stream": stream,
     }
+    if min_tokens is not None:
+        payload["min_tokens"] = min_tokens
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
 
 
@@ -1755,12 +1758,13 @@ def _run_multimodal_max(
     image_url = cap_image_data_url()
     calibrate_config = replace(config, request_timeout_sec=MULTIMODAL_MAX_TIMEOUT_SEC)
 
-    def _one(text: str, max_tokens: int) -> bytes:
+    def _one(text: str, max_tokens: int, *, min_tokens: int | None = None) -> bytes:
         return build_chat_request(
             config.served_model,
             kind="multi_image",
             images=4,
             max_tokens=max_tokens,
+            min_tokens=min_tokens,
             text=text,
             image_url=image_url,
         )
@@ -1806,7 +1810,7 @@ def _run_multimodal_max(
             measurements["multimodal_max"] = {"ok": False, "calibration": {"code": probe["code"], "prompt_tokens": server_prompt}}
             measurements["inference_peak_mib"] = None
             return
-    bodies = [_one(text, MAX_OUTPUT_BUDGET) for _ in range(4)]
+    bodies = [_one(text, MAX_OUTPUT_BUDGET, min_tokens=MAX_OUTPUT_BUDGET) for _ in range(4)]
     if any(len(body) > 32 * 1024 * 1024 for body in bodies):
         results.append(_case("multimodal_max", "failed", "max request body exceeds 32MiB", config))
         measurements["inference_peak_mib"] = None
@@ -2450,6 +2454,35 @@ def _write_stage_notes(lines: list[str]) -> None:
     path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 
 
+def _append_stage_notes(lines: list[str]) -> None:
+    path = ROOT / "local" / "stage2_notes.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    existing = path.read_text(encoding="utf-8") if path.exists() else ""
+    if existing and not existing.endswith("\n"):
+        existing += "\n"
+    if existing and not existing.endswith("\n\n"):
+        existing += "\n"
+    path.write_text(existing + "\n".join(lines).rstrip() + "\n", encoding="utf-8")
+
+
+def _pre_load_baseline(config: RunConfig, measurements: dict[str, Any]) -> tuple[int | None, str]:
+    """Use a fresh unloaded reading, or the stored pre-load value when the model is already up."""
+    _code, status = _status(config)
+    already_ready = status.get("state") == "ready" and status.get("residency") == "resident"
+    stored = measurements.get("supplement_baseline_mib")
+    if already_ready:
+        if isinstance(stored, int):
+            return stored, (
+                f"모델이 이미 ready라 로드 전 baseline은 gpu_measurements.json의 "
+                f"supplement_baseline_mib {stored} MiB를 사용했다."
+            )
+        return None, "모델이 이미 ready인데 로드 전 baseline 기록이 없다."
+    measured = _gpu_used_mib()
+    if measured is None:
+        return None, "로드 전 nvidia-smi baseline을 읽지 못했다."
+    return measured, f"로드 전 호스트 baseline은 {measured} MiB다."
+
+
 def _ensure_model_ready(config: RunConfig) -> tuple[bool, str]:
     started = _compose(config.root, ["up", "-d", "--no-build", "--no-recreate", config.service])
     if started.returncode != 0:
@@ -2597,11 +2630,88 @@ def run_supplement(config: RunConfig, *, skip_comparison: bool = False) -> int:
         _write_stage_notes(notes)
 
 
+def run_max_only(config: RunConfig) -> int:
+    """Rerun only the four-way multimodal max case. Other stage-2 checks stay as recorded."""
+    print("max-only: load existing measurements", flush=True)
+    measurements: dict[str, Any] = {}
+    if MEASUREMENTS.exists():
+        measurements = json.loads(MEASUREMENTS.read_text(encoding="utf-8"))
+    baseline, baseline_note = _pre_load_baseline(config, measurements)
+    notes = [
+        "## 최대 조건만 재측정",
+        "",
+        baseline_note,
+        "",
+        "lifecycle, 품질 비교, TTFT, GDN probe는 다시 실행하지 않았다.",
+        "채점 요청에만 min_tokens 4096을 넣었다. max_tokens 4096은 그대로다.",
+        "",
+    ]
+    exit_code = 1
+    try:
+        ready, ready_detail = _ensure_model_ready(config)
+        notes.append(f"FP8 load: ready={ready} detail={ready_detail[:400]}")
+        if not ready:
+            notes.append("모델을 올리지 못했다. 확정값은 넣지 않았다.")
+            return 1
+        container_id = _owned_container(config.root, config.service)
+        updates: list[CaseResult] = []
+        print("max-only: multimodal max", flush=True)
+        _run_multimodal_max(config, container_id, updates, measurements)
+        max_case = updates[-1] if updates else None
+        max_passed = max_case is not None and max_case.status == "passed" and max_case.id == "multimodal_max"
+        host_peak = measurements.get("inference_peak_mib")
+        peak_value = host_peak if isinstance(host_peak, int) else None
+        record = measurements.get("multimodal_max")
+        record = record if isinstance(record, dict) else {}
+        notes.append(f"최대 조건: passed={max_passed} host_peak_mib={peak_value}")
+        notes.append(f"requests={record.get('requests')}")
+        notes.append(
+            f"preemption_before={record.get('preemption_before')} "
+            f"preemption_clear={record.get('preemption_clear')}"
+        )
+        if not max_passed or max_case is None:
+            notes.append(
+                "조기 종료, preemption, OOM, 또는 그 밖의 실패라 확정값을 넣지 않았다. "
+                "gpu_api.json과 inferswap_connection.json은 바꾸지 않았다."
+            )
+            return 1
+        if not isinstance(baseline, int) or peak_value is None or peak_value < baseline:
+            notes.append("peak 또는 로드 전 baseline이 없어 inferencePeakBytes를 확정하지 않았다.")
+            return 1
+        attributed = (peak_value - baseline) * _MIB
+        _merge_cases([max_case])
+        write_connection(
+            config,
+            confirmed=True,
+            host_peak=peak_value,
+            baseline=baseline,
+            reason="multimodal max passed",
+        )
+        _save_measurements(measurements)
+        notes.append(
+            f"inferencePeakBytes={attributed} "
+            f"(host {peak_value} MiB − baseline {baseline} MiB). "
+            "maxConcurrency 4, maxPixels 262144, maxOutputTokens 4096을 확정했다."
+        )
+        notes.append("prepare.argv는 prepare-inferswap 절대 경로 하나다.")
+        exit_code = 0
+        return 0
+    except Exception as exc:
+        notes.append(f"최대 조건 재측정이 예외로 끝났다: {exc}")
+        notes.append("확정값은 넣지 않았다.")
+        exit_code = 1
+        return 1
+    finally:
+        _append_stage_notes(notes)
+        print(f"max-only: exit {exit_code}", flush=True)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Independent GPU/API verification")
     parser.add_argument("--check-plan", action="store_true")
     parser.add_argument("--execute", action="store_true", help="Run the GPU/API cases against the compose service")
     parser.add_argument("--supplement", action="store_true", help="Rerun max-condition, quality, TTFT, and GDN checks only")
+    parser.add_argument("--max-only", action="store_true", help="Rerun only the multimodal max case")
     parser.add_argument("--base-url", default="")
     parser.add_argument("--service", default=SERVICE)
     parser.add_argument("--profile", default="qwen3.8-27b")
@@ -2613,7 +2723,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.check_plan:
         check_plan()
-    if not args.execute and not args.supplement:
+    if not args.execute and not args.supplement and not args.max_only:
         if not args.check_plan:
             print("GPU suite was not executed. Pass --execute to run it.", file=sys.stderr)
         return 0
@@ -2630,6 +2740,8 @@ def main(argv: list[str] | None = None) -> int:
         load_timeout_sec=args.load_timeout_sec,
         request_timeout_sec=args.request_timeout_sec,
     )
+    if args.max_only:
+        return run_max_only(config)
     if args.supplement:
         return run_supplement(config, skip_comparison=args.skip_comparison)
     results = execute_suite(config)

@@ -1,16 +1,11 @@
 {
   "suite": "cpu_config",
-  "started_at": "2026-10-08T06:26:09.378158+00:00",
-  "finished_at": "2026-10-08T06:26:09.559081+00:00",
+  "started_at": "2026-10-08T07:10:25.285513+00:00",
+  "finished_at": "2026-10-08T07:10:25.357882+00:00",
   "status": "passed",
   "cases": [
     {
       "id": "test_gpu_requests_and_evidence_rules",
-      "status": "passed",
-      "detail": "ok"
-    },
-    {
-      "id": "test_gpu_script_check_plan_does_not_claim_gpu_success",
       "status": "passed",
       "detail": "ok"
     }

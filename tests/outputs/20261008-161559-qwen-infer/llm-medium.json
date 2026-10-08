@@ -1,0 +1,33 @@
+{
+  "name": "llm-medium",
+  "http_status": 200,
+  "e2e_sec": 1.806,
+  "finish_reason": "stop",
+  "content": "\n\n391",
+  "reasoning_content": "The user wants me to calculate 17 × 23 and reply with just the number.\n\n17 × 23 = 17 × 20 + 17 × 3 = 340 + 51 = 391\n",
+  "content_chars": 5,
+  "reasoning_chars": 116,
+  "usage": {
+    "prompt_tokens": 30,
+    "completion_tokens": 63,
+    "total_tokens": 93
+  },
+  "timings": {
+    "prompt_n": null,
+    "prompt_ms": null,
+    "prompt_per_second": null,
+    "predicted_n": null,
+    "predicted_ms": null,
+    "predicted_per_second": null
+  },
+  "request": {
+    "kind": "llm",
+    "prompt": "What is 17 times 23? Reply with the number only in the final answer.",
+    "max_tokens": 768,
+    "temperature": 0,
+    "chat_template_kwargs": {
+      "reasoning_effort": "medium"
+    }
+  },
+  "error": null
+}

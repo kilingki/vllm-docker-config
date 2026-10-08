@@ -257,8 +257,8 @@
     53.198243379592896
   ],
   "multimodal_max": {
-    "ok": false,
-    "elapsed_sec": 130.75679111480713,
+    "ok": true,
+    "elapsed_sec": 133.85603737831116,
     "processor": {
       "source_pixels": 589824,
       "processed_width": 512,
@@ -273,35 +273,35 @@
         "prompt_tokens": 27290,
         "completion_tokens": 4096,
         "finish_reason": "length",
-        "latency_sec": 124.04300576300011
+        "latency_sec": 133.85509375900438
       },
       {
         "code": 200,
         "prompt_tokens": 27290,
         "completion_tokens": 4096,
         "finish_reason": "length",
-        "latency_sec": 124.08421794899914
-      },
-      {
-        "code": 200,
-        "prompt_tokens": 27290,
-        "completion_tokens": 2238,
-        "finish_reason": "stop",
-        "latency_sec": 69.60454342899902
+        "latency_sec": 133.82407343000523
       },
       {
         "code": 200,
         "prompt_tokens": 27290,
         "completion_tokens": 4096,
         "finish_reason": "length",
-        "latency_sec": 124.08313123199332
+        "latency_sec": 133.85339194598782
+      },
+      {
+        "code": 200,
+        "prompt_tokens": 27290,
+        "completion_tokens": 4096,
+        "finish_reason": "length",
+        "latency_sec": 133.85336370699224
       }
     ],
-    "host_peak_mib": 23613,
+    "host_peak_mib": 23777,
     "preemption_before": 0.0,
     "preemption_clear": true
   },
-  "inference_peak_mib": 23613,
+  "inference_peak_mib": 23777,
   "supplement_baseline_mib": 1183,
   "gdn_state_dtype": {
     "line": "mamba cache dtype torch.bfloat16 ssm state dtype torch.float32",

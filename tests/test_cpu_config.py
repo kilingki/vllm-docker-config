@@ -250,8 +250,12 @@ def test_gpu_requests_and_evidence_rules():
 
     text = build_chat_request("qwen3.8-27b", kind="text", max_tokens=32)
     image = build_chat_request("qwen3.8-27b", kind="image", images=1, text="Describe the image.")
+    scored = build_chat_request("qwen3.8-27b", kind="text", max_tokens=4096, min_tokens=4096)
     assert b"image_url" not in text
     assert b'"max_tokens":32' in text
+    assert b'"min_tokens"' not in text
+    assert b'"max_tokens":4096' in scored
+    assert b'"min_tokens":4096' in scored
     assert b"image_url" in image
     assert b"data:image/png;base64," in image
     config = RunConfig(base_url="http://127.0.0.1:9")

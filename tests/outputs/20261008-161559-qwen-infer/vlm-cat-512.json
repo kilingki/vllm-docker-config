@@ -1,0 +1,35 @@
+{
+  "name": "vlm-cat-512",
+  "http_status": 200,
+  "e2e_sec": 0.927,
+  "finish_reason": "stop",
+  "content": "This image features a close-up of an orange tabby cat with striking green eyes, looking directly at the camera.",
+  "reasoning_content": "",
+  "content_chars": 111,
+  "reasoning_chars": 0,
+  "usage": {
+    "prompt_tokens": 286,
+    "completion_tokens": 24,
+    "total_tokens": 310
+  },
+  "timings": {
+    "prompt_n": null,
+    "prompt_ms": null,
+    "prompt_per_second": null,
+    "predicted_n": null,
+    "predicted_ms": null,
+    "predicted_per_second": null
+  },
+  "request": {
+    "kind": "vlm",
+    "prompt": "Describe this image in one sentence. Include the kind of animal and its color.",
+    "max_tokens": 256,
+    "temperature": 0,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "image_file": "test-cat-512.jpg",
+    "image_bytes": 34447
+  },
+  "error": null
+}
